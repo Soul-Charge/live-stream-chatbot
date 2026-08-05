@@ -6,7 +6,7 @@ import { ConfigStore } from './config.js';
 import { RequestError, matchRole, parseRequest } from './request.js';
 import { TTSEngine } from './tts.js';
 import { PlayerQueue } from './player.js';
-import { ensureTtsApi } from './api.js';
+import { ensureTtsApi, setTtsWeights } from './api.js';
 
 const CONFIG_FILE = resolve('config', 'config.json');
 const EXAMPLE_FILE = resolve('config', 'config.example.json');
@@ -48,6 +48,15 @@ async function main() {
   store.watch();
 
   await ensureTtsApi(store.get(), log);
+  const ttsConfig = store.get().tts ?? {};
+  const defaultParams = store.get().roles?.default?.params ?? {};
+  await setTtsWeights(
+    ttsConfig.baseUrl,
+    defaultParams.gpt_path,
+    defaultParams.sovits_path,
+    Number(store.get().gptSoVits?.startupTimeoutMs) || 180000,
+    log,
+  );
 
   const server = createServer(async (req, res) => {
     const config = store.get();

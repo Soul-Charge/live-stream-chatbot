@@ -1,4 +1,20 @@
 import { Readable } from 'node:stream';
+import { setTtsWeights } from './api.js';
+
+function modelKeyOf(params) {
+  const gptPath = params?.gpt_path;
+  const sovitsPath = params?.sovits_path;
+  return gptPath && sovitsPath ? `${gptPath}\n${sovitsPath}` : null;
+}
+
+function hasRoleModels(roles) {
+  return Object.values(roles ?? {}).some((role) => modelKeyOf(role?.params));
+}
+
+function effectiveConcurrency(config) {
+  const configured = Number(config.tts?.concurrency) || 1;
+  return hasRoleModels(config.roles) ? 1 : configured;
+}
 
 export class TaskQueue {
   #tasks = [];
@@ -46,14 +62,17 @@ export class TaskQueue {
 export class TTSEngine {
   #store;
   #queue;
+  #loadedModelKey;
 
   constructor(store) {
     this.#store = store;
-    this.#queue = new TaskQueue(store.get().tts?.concurrency ?? 1);
+    const config = store.get();
+    this.#queue = new TaskQueue(effectiveConcurrency(config));
+    this.#loadedModelKey = modelKeyOf(config.roles?.default?.params);
   }
 
   setConcurrency(value) {
-    this.#queue.setConcurrency(value);
+    this.#queue.setConcurrency(effectiveConcurrency(this.#store.get()));
   }
 
   enqueue(text, role) {
@@ -63,6 +82,22 @@ export class TTSEngine {
   async #synthesize(text, role) {
     const config = this.#store.get();
     const tts = config.tts ?? {};
+    const baseUrl = String(tts.baseUrl ?? 'http://127.0.0.1:9880').replace(/\/+$/, '');
+    const endpoint = String(tts.endpoint ?? '/tts');
+    const url = baseUrl + (endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
+
+    const roleParams = role?.params ?? {};
+    const modelKey = modelKeyOf(roleParams);
+    if (modelKey && modelKey !== this.#loadedModelKey) {
+      await setTtsWeights(
+        baseUrl,
+        roleParams.gpt_path,
+        roleParams.sovits_path,
+        Math.max(Number(tts.requestTimeoutMs) || 30000, 180000),
+      );
+      this.#loadedModelKey = modelKey;
+    }
+
     const payload = {
       text,
       text_lang: tts.textLang ?? 'zh',
@@ -74,13 +109,9 @@ export class TTSEngine {
       media_type: tts.mediaType ?? 'wav',
       streaming_mode: tts.streamingMode ?? true,
       ...(tts.params ?? {}),
-      ...(role?.params ?? {}),
+      ...roleParams,
     };
     if (role?.model) payload.model = role.model;
-
-    const baseUrl = String(tts.baseUrl ?? 'http://127.0.0.1:9880').replace(/\/+$/, '');
-    const endpoint = String(tts.endpoint ?? '/tts');
-    const url = baseUrl + (endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Number(tts.requestTimeoutMs) || 30000);

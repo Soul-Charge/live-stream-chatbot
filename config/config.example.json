@@ -1,0 +1,56 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 7788,
+    "path": "/tts",
+    "maxBodyBytes": 16384
+  },
+  "text": {
+    "maxTextLength": 200,
+    "blockedWords": ["测试屏蔽词"],
+    "blockedMode": "reject",
+    "replacements": {
+      "阿巴阿巴": "好的",
+      "（）": ""
+    }
+  },
+  "roles": {
+    "default": {
+      "refAudio": "E:/GPT-SoVITS/refs/default.wav",
+      "refText": "这是默认角色的参考文本。",
+      "params": {
+        "gpt_path": "models/default/gpt.ckpt",
+        "sovits_path": "models/default/sovits.pth"
+      }
+    },
+    "管理员": {
+      "keywords": ["管理员"],
+      "refAudio": "E:/GPT-SoVITS/refs/admin.wav",
+      "refText": "这是管理员的参考文本。",
+      "params": {
+        "gpt_path": "models/admin/gpt.ckpt",
+        "sovits_path": "models/admin/sovits.pth"
+      }
+    }
+  },
+  "tts": {
+    "baseUrl": "http://127.0.0.1:9880",
+    "endpoint": "/tts",
+    "concurrency": 1,
+    "requestTimeoutMs": 30000,
+    "textLang": "zh",
+    "promptLang": "zh",
+    "textSplitMethod": "cut0",
+    "batchSize": 1,
+    "mediaType": "wav",
+    "streamingMode": true,
+    "params": {}
+  },
+  "player": {
+    "command": "ffplay",
+    "args": ["-nodisp", "-autoexit", "-loglevel", "quiet", "-i", "-"]
+  },
+  "log": {
+    "level": "info"
+  }
+}

@@ -33,6 +33,13 @@
       }
     }
   },
+  "gptSoVits": {
+    "path": "F:/AiSound/GPT-SoVITS-v2pro-20250604",
+    "autoStart": true,
+    "startScript": "API.bat",
+    "startupTimeoutMs": 180000,
+    "pollIntervalMs": 2000
+  },
   "tts": {
     "baseUrl": "http://127.0.0.1:9880",
     "endpoint": "/tts",

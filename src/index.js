@@ -6,6 +6,7 @@ import { ConfigStore } from './config.js';
 import { RequestError, matchRole, parseRequest } from './request.js';
 import { TTSEngine } from './tts.js';
 import { PlayerQueue } from './player.js';
+import { ensureTtsApi } from './api.js';
 
 const CONFIG_FILE = resolve('config', 'config.json');
 const EXAMPLE_FILE = resolve('config', 'config.example.json');
@@ -28,7 +29,7 @@ function sendJson(res, status, data) {
   res.end(body);
 }
 
-function main() {
+async function main() {
   const configFile = existsSync(CONFIG_FILE) ? CONFIG_FILE : EXAMPLE_FILE;
   const store = new ConfigStore(configFile);
   logLevel = store.get().log?.level ?? 'info';
@@ -45,6 +46,8 @@ function main() {
     log('info', '配置已热重载');
   });
   store.watch();
+
+  await ensureTtsApi(store.get(), log);
 
   const server = createServer(async (req, res) => {
     const config = store.get();
@@ -106,4 +109,7 @@ function main() {
   process.on('SIGTERM', shutdown);
 }
 
-main();
+main().catch((err) => {
+  log('error', `启动失败: ${err.message}`);
+  process.exit(1);
+});

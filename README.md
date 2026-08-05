@@ -10,6 +10,7 @@
 | 请求解析与清洗 | `src/request.js` | 安全解析 HTTP 请求体，屏蔽词拦截、长度限制、替换字典清洗 |
 | TTS 引擎适配 | `src/tts.js` | 异步并发队列，将文本与角色映射为 GPT-SoVITS 参数并获取音频流 |
 | 流式播放调度 | `src/player.js` | 将音频流桥接至本地播放器 stdin，顺序播报并处理退出事件 |
+| 推理 API 守护 | `src/api.js` | 启动时探测 TTS 后端，未运行则按配置自动拉起并等待就绪 |
 | 服务入口 | `src/index.js` | HTTP 服务、路由、角色匹配、任务流水线编排 |
 
 ## 快速开始
@@ -25,6 +26,8 @@
    ```powershell
    npm start
    ```
+
+   主程序启动时会先检查 `tts.baseUrl` 对应的推理 API；如果未运行，会根据 `gptSoVits.path` 自动启动 `API.bat` 并等待就绪。
 
 3. 在弹幕姬中将 TTS 地址设为 `http://127.0.0.1:7788/tts`，请求体示例：
 
@@ -42,6 +45,7 @@
 - `server`：中间件监听地址、端口、路径及请求体大小限制。
 - `text`：文本清洗规则，包括最长长度、屏蔽词（`reject` 拦截 / `strip` 删除）与替换字典。
 - `roles`：角色映射表，`keywords` 按请求中的用户名或文本部分匹配；请求可显式传 `role` 精确指定；未匹配时使用 `default`。
+- `gptSoVits`：GPT-SoVITS 安装目录与自动启动配置。`path` 指向推理 API 所在目录，`autoStart` 为 `true` 时主程序会在 API 未运行时自动执行 `startScript`，`startupTimeoutMs` 为等待就绪的最长时间。
 - `tts`：后端地址与合成参数。`params` 为公共载荷扩展字段，各角色的 `params` 可覆盖，适配不同 GPT-SoVITS 封装版本。
 - `player`：本地播放器命令，默认使用 ffplay（来自 FFmpeg），需已安装并加入 PATH。
 

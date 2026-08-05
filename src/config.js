@@ -21,6 +21,13 @@ export const DEFAULT_CONFIG = {
       params: {},
     },
   },
+  gptSoVits: {
+    path: '',
+    autoStart: false,
+    startScript: 'API.bat',
+    startupTimeoutMs: 180000,
+    pollIntervalMs: 2000,
+  },
   tts: {
     baseUrl: 'http://127.0.0.1:9880',
     endpoint: '/tts',

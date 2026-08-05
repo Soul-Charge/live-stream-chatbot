@@ -78,7 +78,7 @@ async function main() {
 
     try {
       const parsed = await parseRequest(req, config);
-      const { roleName, role } = matchRole(parsed.name, parsed.text, config.roles, parsed.roleHint);
+      const { roleName, role } = matchRole(parsed.text, config.roles, parsed.roleHint);
       log('info', `收到播报: 用户=${parsed.name || '-'} 角色=${roleName} 文本=${parsed.text}`);
 
       tts

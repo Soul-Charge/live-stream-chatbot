@@ -16,6 +16,7 @@ export const DEFAULT_CONFIG = {
   },
   roles: {
     default: {
+      comment: '',
       refAudio: '',
       refText: '',
       params: {},

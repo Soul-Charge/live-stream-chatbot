@@ -16,20 +16,30 @@
   },
   "roles": {
     "default": {
-      "refAudio": "E:/GPT-SoVITS/refs/default.wav",
-      "refText": "这是默认角色的参考文本。",
+      "comment": "樱羽艾玛",
+      "refAudio": "F:/AiSound/训练文件/自整理用音频/ema/0101Adv08_Ema007.ogg",
+      "refText": "あの、その看守のことなんだけど……ボク、さっきアリサちゃんが捕まっちゃってるの見ちゃって……。",
       "params": {
-        "gpt_path": "models/default/gpt.ckpt",
-        "sovits_path": "models/default/sovits.pth"
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/ema-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/ema_e8_s2232.pth"
       }
     },
-    "管理员": {
-      "keywords": ["管理员"],
-      "refAudio": "E:/GPT-SoVITS/refs/admin.wav",
-      "refText": "这是管理员的参考文本。",
+    "NTE0": {
+      "comment": "二阶堂希罗",
+      "refAudio": "",
+      "refText": "",
       "params": {
-        "gpt_path": "models/admin/gpt.ckpt",
-        "sovits_path": "models/admin/sovits.pth"
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/hiro-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/hiro_e8_s2184.pth"
+      }
+    },
+    "可见性实验": {
+      "comment": "橘雪莉",
+      "refAudio": "",
+      "refText": "",
+      "params": {
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/sherry-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/sherry_e8_s808.pth"
       }
     }
   },

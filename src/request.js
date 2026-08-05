@@ -58,24 +58,58 @@ export function cleanText(rawText, textConfig) {
   return result;
 }
 
-export function matchRole(name, text, roles, roleHint) {
+function roleAliases(role, key) {
+  const aliases = [key];
+  if (role?.comment) aliases.push(String(role.comment));
+  for (const keyword of Array.isArray(role?.keywords) ? role.keywords : []) {
+    if (keyword) aliases.push(String(keyword));
+  }
+  return [...new Set(aliases.filter(Boolean))];
+}
+
+function matchRoleFromText(text, roles) {
+  const table = roles ?? {};
+  const raw = String(text ?? '');
+  const candidates = [];
+
+  for (const [key, role] of Object.entries(table)) {
+    for (const alias of roleAliases(role, key)) {
+      const marker = `${alias}说`;
+      // 只检查弹幕开头的“角色名说”，避免文本中其他角色名再次触发模型切换
+      if (raw.startsWith(marker)) {
+        candidates.push({ key, role, alias });
+      }
+    }
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => b.alias.length - a.alias.length);
+    const best = candidates[0];
+    return {
+      roleName: best.key,
+      role: best.role,
+      text: raw,
+    };
+  }
+
+  return {
+    roleName: 'default',
+    role: table.default ?? null,
+    text: raw,
+  };
+}
+
+export function matchRole(text, roles, roleHint) {
   const table = roles ?? {};
   if (roleHint && table[roleHint]) {
-    return { roleName: roleHint, role: table[roleHint] };
+    const matched = matchRoleFromText(text, { [roleHint]: table[roleHint] });
+    return {
+      roleName: roleHint,
+      role: table[roleHint],
+      text: matched.text,
+    };
   }
-
-  const entries = Object.entries(table).filter(([key]) => key !== 'default');
-  const keywordsOf = (role) => (Array.isArray(role?.keywords) ? role.keywords : []);
-  const findMatch = (haystack) =>
-    entries.find(([, role]) =>
-      keywordsOf(role).some((keyword) => keyword && haystack.includes(keyword)),
-    );
-
-  const matched = (name ? findMatch(String(name)) : undefined) ?? (text ? findMatch(String(text)) : undefined);
-  if (matched) {
-    return { roleName: matched[0], role: matched[1] };
-  }
-  return { roleName: 'default', role: table.default ?? null };
+  return matchRoleFromText(text, table);
 }
 
 export async function parseRequest(req, config) {

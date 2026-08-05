@@ -7,7 +7,7 @@
 | 模块 | 文件 | 职责 |
 | --- | --- | --- |
 | 配置热更新 | `src/config.js` | 内存中维护全局配置，监听配置文件变化并自动热重载 |
-| 请求解析与清洗 | `src/request.js` | 安全解析 HTTP 请求体，屏蔽词拦截、长度限制、替换字典清洗 |
+| 请求解析与清洗 | `src/request.js` | 安全解析 HTTP 请求体，屏蔽词拦截、长度限制、替换字典清洗、弹幕“xxx说”角色匹配 |
 | TTS 引擎适配 | `src/tts.js` | 异步并发队列，将文本与角色映射为 GPT-SoVITS 参数并获取音频流 |
 | 流式播放调度 | `src/player.js` | 将音频流桥接至本地播放器 stdin，顺序播报并处理退出事件 |
 | 推理 API 守护 | `src/api.js` | 启动时探测 TTS 后端，未运行则按配置自动拉起并设置角色模型 |
@@ -44,7 +44,7 @@
 
 - `server`：中间件监听地址、端口、路径及请求体大小限制。
 - `text`：文本清洗规则，包括最长长度、屏蔽词（`reject` 拦截 / `strip` 删除）与替换字典。
-- `roles`：角色映射表，`keywords` 按请求中的用户名或文本部分匹配；请求可显式传 `role` 精确指定；未匹配时使用 `default`。
+- `roles`：角色映射表。程序只检查弹幕文本开头的“角色名说”来切换角色，角色名可以是角色键或 `comment` 注释；文本中间出现其他角色名不会再次触发切换，且该匹配不会修改最终播报文本。未匹配时使用 `default`，也可通过请求参数 `role` 精确指定。
 - `gptSoVits`：GPT-SoVITS 安装目录与自动启动配置。`path` 指向推理 API 所在目录，`autoStart` 为 `true` 时主程序会在 API 未运行时自动执行 `startScript`，`startupTimeoutMs` 为等待就绪的最长时间。API 就绪后会用 `roles.default.params` 中的 `gpt_path`/`sovits_path` 设置模型。
 - `tts`：后端地址与合成参数。`params` 为公共载荷扩展字段，各角色的 `params` 可覆盖，适配不同 GPT-SoVITS 封装版本；`promptLang` 应与参考文本语言一致（日文参考音频建议填 `ja`）。
 - `player`：本地播放器命令，默认使用 ffplay（来自 FFmpeg），需已安装并加入 PATH。

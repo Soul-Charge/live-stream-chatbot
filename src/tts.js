@@ -63,9 +63,11 @@ export class TTSEngine {
   #store;
   #queue;
   #loadedModelKey;
+  #log;
 
-  constructor(store) {
+  constructor(store, log = () => {}) {
     this.#store = store;
+    this.#log = log;
     const config = store.get();
     this.#queue = new TaskQueue(effectiveConcurrency(config));
     this.#loadedModelKey = modelKeyOf(config.roles?.default?.params);
@@ -89,11 +91,13 @@ export class TTSEngine {
     const roleParams = role?.params ?? {};
     const modelKey = modelKeyOf(roleParams);
     if (modelKey && modelKey !== this.#loadedModelKey) {
+      this.#log('info', `切换推理模型: ${roleParams.gpt_path}`);
       await setTtsWeights(
         baseUrl,
         roleParams.gpt_path,
         roleParams.sovits_path,
         Math.max(Number(tts.requestTimeoutMs) || 30000, 180000),
+        this.#log,
       );
       this.#loadedModelKey = modelKey;
     }
@@ -127,7 +131,8 @@ export class TTSEngine {
         throw new Error(`TTS 后端返回 ${response.status}: ${detail.slice(0, 200)}`);
       }
       if (!response.body) throw new Error('TTS 后端未返回音频流');
-      return Readable.fromWeb(response.body);
+      const audio = Buffer.from(await response.arrayBuffer());
+      return Readable.from(audio);
     } finally {
       clearTimeout(timer);
     }

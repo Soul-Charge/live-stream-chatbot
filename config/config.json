@@ -1,0 +1,73 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 7788,
+    "path": "/tts",
+    "maxBodyBytes": 16384
+  },
+  "text": {
+    "maxTextLength": 200,
+    "blockedWords": ["测试屏蔽词"],
+    "blockedMode": "reject",
+    "replacements": {
+      "阿巴阿巴": "好的",
+      "（）": ""
+    }
+  },
+  "roles": {
+    "default": {
+      "comment": "樱羽艾玛",
+      "refAudio": "F:/AiSound/训练文件/自整理用音频/ema/0101Adv08_Ema007.ogg",
+      "refText": "あの、その看守のことなんだけど……ボク、さっきアリサちゃんが捕まっちゃってるの見ちゃって……。",
+      "params": {
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/ema-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/ema_e8_s2232.pth"
+      }
+    },
+    "NTE0": {
+      "comment": "二阶堂希罗",
+      "refAudio": "F:/AiSound/训练文件/自整理用音频/hiro/0101Adv02_Hiro003.ogg",
+      "refText": "正しい説明がなされるのかな。それなら早く向かわないと……。",
+      "params": {
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/hiro-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/hiro_e8_s2184.pth"
+      }
+    },
+    "可见性实验": {
+      "comment": "橘雪莉",
+      "refAudio": "F:/AiSound/训练文件/自整理用音频/sherry/0101Adv08_Sherry008.ogg",
+      "refText": "私もエマさんと同じですよ。魔法なんて初めて知りましたし、使えません。",
+      "params": {
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/sherry-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/sherry_e8_s808.pth"
+      }
+    }
+  },
+  "gptSoVits": {
+    "path": "F:/AiSound/GPT-SoVITS-v2pro-20250604",
+    "autoStart": true,
+    "startScript": "API.bat",
+    "startupTimeoutMs": 180000,
+    "pollIntervalMs": 2000
+  },
+  "tts": {
+    "baseUrl": "http://127.0.0.1:9880",
+    "endpoint": "/tts",
+    "concurrency": 1,
+    "requestTimeoutMs": 30000,
+    "textLang": "zh",
+    "promptLang": "ja",
+    "textSplitMethod": "cut0",
+    "batchSize": 1,
+    "mediaType": "wav",
+    "streamingMode": true,
+    "params": {}
+  },
+  "player": {
+    "command": "ffplay",
+    "args": ["-nodisp", "-autoexit", "-loglevel", "quiet", "-i", "-"]
+  },
+  "log": {
+    "level": "info"
+  }
+}

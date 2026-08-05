@@ -16,6 +16,7 @@ export class PlayerQueue {
   }
 
   enqueue(stream) {
+    stream.on('error', () => {});
     const run = this.#tail.then(() => this.#play(stream));
     this.#tail = run.catch(() => {});
     return run;

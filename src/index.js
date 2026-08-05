@@ -38,7 +38,7 @@ async function main() {
     () => store.get().player ?? {},
     (err) => log('error', `播放器错误: ${err.message}`),
   );
-  const tts = new TTSEngine(store);
+  const tts = new TTSEngine(store, log);
 
   store.onChange((config) => {
     logLevel = config.log?.level ?? 'info';

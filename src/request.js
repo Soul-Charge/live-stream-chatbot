@@ -70,13 +70,17 @@ function roleAliases(role, key) {
 function matchRoleFromText(text, roles) {
   const table = roles ?? {};
   const raw = String(text ?? '');
+  const head = raw
+    .replace(/^[\s\uFEFF\u200B\u2060「『【［(（:：,，.。]+/, '')
+    .replace(/\s+/g, '');
+  const normalizedHead = head.toLowerCase();
   const candidates = [];
 
   for (const [key, role] of Object.entries(table)) {
     for (const alias of roleAliases(role, key)) {
       const marker = `${alias}说`;
       // 只检查弹幕开头的“角色名说”，避免文本中其他角色名再次触发模型切换
-      if (raw.startsWith(marker)) {
+      if (normalizedHead.startsWith(marker.toLowerCase())) {
         candidates.push({ key, role, alias });
       }
     }

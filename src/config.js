@@ -13,6 +13,7 @@ export const DEFAULT_CONFIG = {
     blockedWords: [],
     blockedMode: 'reject',
     replacements: {},
+    zhReplacements: {},
   },
   roles: {
     default: {
@@ -34,7 +35,7 @@ export const DEFAULT_CONFIG = {
     endpoint: '/tts',
     concurrency: 1,
     requestTimeoutMs: 30000,
-    textLang: 'zh',
+    textLang: 'auto',
     promptLang: 'zh',
     textSplitMethod: 'cut0',
     batchSize: 1,

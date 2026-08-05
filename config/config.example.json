@@ -12,6 +12,9 @@
     "replacements": {
       "阿巴阿巴": "好的",
       "（）": ""
+    },
+    "zhReplacements": {
+      "NTE0": "NTE零"
     }
   },
   "roles": {
@@ -55,7 +58,7 @@
     "endpoint": "/tts",
     "concurrency": 1,
     "requestTimeoutMs": 30000,
-    "textLang": "zh",
+    "textLang": "auto",
     "promptLang": "zh",
     "textSplitMethod": "cut0",
     "batchSize": 1,

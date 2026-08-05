@@ -11,7 +11,12 @@
     "blockedMode": "reject",
     "replacements": {
       "阿巴阿巴": "好的",
-      "（）": ""
+      "（）": "",
+      "条顿武士团":""
+    },
+    "zhReplacements": {
+      "NTE0": "NTE零",
+      "LIOPPPPPPPP": "LIO八P"
     }
   },
   "roles": {
@@ -31,6 +36,15 @@
       "params": {
         "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/hiro-e15.ckpt",
         "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/hiro_e8_s2184.pth"
+      }
+    },
+    "塰歪比巴B": {
+      "comment": "高松灯",
+      "refAudio": "F:/AiSound/训练文件/自整理用音频/tomori/新しい模様の見つけたから。買ったのを、整理しようと思って…….ogg",
+      "refText": "新しい模様の見つけたから。買ったのを、整理しようと思って……",
+      "params": {
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/MyGO_高松灯_v2pp.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/MyGO_高松灯_v2pp.pth"
       }
     },
     "可见性实验": {
@@ -55,7 +69,7 @@
     "endpoint": "/tts",
     "concurrency": 1,
     "requestTimeoutMs": 30000,
-    "textLang": "zh",
+    "textLang": "auto",
     "promptLang": "ja",
     "textSplitMethod": "cut0",
     "batchSize": 1,

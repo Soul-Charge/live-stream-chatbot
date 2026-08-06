@@ -82,7 +82,7 @@ async function main() {
       log('info', `收到播报: 用户=${parsed.name || '-'} 角色=${roleName} 文本=${parsed.text}`);
 
       tts
-        .enqueue(parsed.text, role)
+        .enqueue(parsed.speechText, role)
         .then((stream) => player.enqueue(stream))
         .catch((err) => log('error', `TTS 合成失败: ${err.message}`));
 

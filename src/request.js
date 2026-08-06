@@ -73,7 +73,8 @@ function applyFilters(text, textConfig) {
   }
 }
 
-export function cleanText(rawText, textConfig) {
+export function cleanText(rawText, textConfig, options = {}) {
+  const { applyReplacements = true } = options;
   const cfg = textConfig ?? {};
   let text = String(rawText ?? '')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
@@ -98,8 +99,10 @@ export function cleanText(rawText, textConfig) {
     text = text.slice(0, maxLength);
   }
 
-  for (const [from, entry] of Object.entries(cfg.replacements ?? {})) {
-    text = applyReplacement(text, from, entry);
+  if (applyReplacements) {
+    for (const [from, entry] of Object.entries(cfg.replacements ?? {})) {
+      text = applyReplacement(text, from, entry);
+    }
   }
 
   const result = text.trim();
@@ -198,9 +201,11 @@ export async function parseRequest(req, config) {
   const text = input.text ?? input.msg ?? query.text ?? query.msg ?? '';
   const name = input.name ?? input.user ?? query.name ?? query.user ?? '';
   const roleHint = input.role ?? query.role ?? '';
+  const textConfig = config.text ?? {};
 
   return {
-    text: cleanText(text, config.text ?? {}),
+    text: cleanText(text, textConfig, { applyReplacements: false }),
+    speechText: cleanText(text, textConfig, { applyReplacements: true }),
     name: String(name).trim(),
     roleHint: String(roleHint).trim(),
   };

@@ -9,15 +9,7 @@
     "maxTextLength": 200,
     "blockedWords": ["测试屏蔽词"],
     "blockedMode": "reject",
-    "replacements": {
-      "阿巴阿巴": "好的",
-      "（）": "",
-      "条顿武士团":""
-    },
-    "zhReplacements": {
-      "NTE0": "NTE零",
-      "LIOPPPPPPPP": "LIO八P"
-    }
+    "replacements": {}
   },
   "roles": {
     "default": {
@@ -25,8 +17,8 @@
       "refAudio": "F:/AiSound/训练文件/自整理用音频/ema/0101Adv08_Ema007.ogg",
       "refText": "あの、その看守のことなんだけど……ボク、さっきアリサちゃんが捕まっちゃってるの見ちゃって……。",
       "params": {
-        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/ema-e15.ckpt",
-        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/ema_e8_s2232.pth"
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/ema-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/ema_e8_s2232.pth"
       }
     },
     "NTE0": {
@@ -34,8 +26,8 @@
       "refAudio": "F:/AiSound/训练文件/自整理用音频/hiro/0101Adv02_Hiro003.ogg",
       "refText": "正しい説明がなされるのかな。それなら早く向かわないと……。",
       "params": {
-        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/hiro-e15.ckpt",
-        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/hiro_e8_s2184.pth"
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/hiro-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/hiro_e8_s2184.pth"
       }
     },
     "塰歪比巴B": {
@@ -43,8 +35,17 @@
       "refAudio": "F:/AiSound/训练文件/自整理用音频/tomori/新しい模様の見つけたから。買ったのを、整理しようと思って…….ogg",
       "refText": "新しい模様の見つけたから。買ったのを、整理しようと思って……",
       "params": {
-        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/MyGO_高松灯_v2pp.ckpt",
-        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/MyGO_高松灯_v2pp.pth"
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/MyGO_高松灯_v2pp.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/MyGO_高松灯_v2pp.pth"
+      }
+    },
+    "聪明露娜": {
+      "comment": "诗歌剧",
+      "refAudio": "F:/AiSound/训练文件/自整理用音频/曼波诗歌剧/マチカネタンホイザです！よろよろです～♪.mp3",
+      "refText": "マチカネタンホイザです！よろよろです～♪",
+      "params": {
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/诗歌剧.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/诗歌剧.pth"
       }
     },
     "可见性实验": {
@@ -52,8 +53,8 @@
       "refAudio": "F:/AiSound/训练文件/自整理用音频/sherry/0101Adv08_Sherry008.ogg",
       "refText": "私もエマさんと同じですよ。魔法なんて初めて知りましたし、使えません。",
       "params": {
-        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2Pro/sherry-e15.ckpt",
-        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2Pro/sherry_e8_s808.pth"
+        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/sherry-e15.ckpt",
+        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/sherry_e8_s808.pth"
       }
     }
   },

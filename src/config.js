@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, watch } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 export const DEFAULT_CONFIG = {
   server: {
@@ -13,7 +13,8 @@ export const DEFAULT_CONFIG = {
     blockedWords: [],
     blockedMode: 'reject',
     replacements: {},
-    zhReplacements: {},
+    startFilters: [],
+    entranceFilter: null,
   },
   roles: {
     default: {
@@ -78,6 +79,7 @@ function deepMerge(base, override) {
 
 export class ConfigStore {
   #file;
+  #replacementsFile;
   #config;
   #watcher = null;
   #listeners = new Set();
@@ -85,6 +87,7 @@ export class ConfigStore {
 
   constructor(file) {
     this.#file = resolve(file);
+    this.#replacementsFile = join(dirname(this.#file), 'replacements.json');
     this.#config = deepMerge(DEFAULT_CONFIG, this.#readFile());
   }
 
@@ -99,10 +102,30 @@ export class ConfigStore {
   #readFile() {
     if (!existsSync(this.#file)) return {};
     try {
-      return JSON.parse(readFileSync(this.#file, 'utf8'));
+      const config = JSON.parse(readFileSync(this.#file, 'utf8'));
+      const replacements = this.#readReplacementsFile();
+      if (replacements) {
+        config.text = {
+          ...(config.text ?? {}),
+          replacements: replacements.replacements ?? {},
+          startFilters: Array.isArray(replacements.startFilters) ? replacements.startFilters : [],
+          entranceFilter: replacements.entranceFilter ?? null,
+        };
+      }
+      return config;
     } catch (err) {
       console.error(`[config] 读取配置文件失败: ${err.message}`);
       return {};
+    }
+  }
+
+  #readReplacementsFile() {
+    if (!existsSync(this.#replacementsFile)) return null;
+    try {
+      return JSON.parse(readFileSync(this.#replacementsFile, 'utf8'));
+    } catch (err) {
+      console.error(`[config] 读取替换配置失败: ${err.message}`);
+      return null;
     }
   }
 
@@ -123,8 +146,9 @@ export class ConfigStore {
     if (this.#watcher) return this;
     const dir = dirname(this.#file);
     const name = basename(this.#file);
+    const replacementsName = basename(this.#replacementsFile);
     this.#watcher = watch(dir, (_event, filename) => {
-      if (filename && basename(String(filename)) !== name) return;
+      if (filename && ![name, replacementsName].includes(basename(String(filename)))) return;
       clearTimeout(this.#debounceTimer);
       this.#debounceTimer = setTimeout(() => {
         try {

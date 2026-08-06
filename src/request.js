@@ -26,6 +26,53 @@ function readBody(req, maxBytes) {
   });
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function applyReplacement(text, from, entry) {
+  if (!from) return text;
+  const descriptor = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : null;
+  const to = descriptor ? String(descriptor.value ?? '') : String(entry ?? '');
+  if (descriptor && descriptor.caseSensitive === false) {
+    return text.replace(new RegExp(escapeRegExp(from), 'gi'), () => to);
+  }
+  return text.split(from).join(to);
+}
+
+function normalizeForMatch(value) {
+  return String(value ?? '');
+}
+
+function matchesStart(text, match, caseSensitive) {
+  const haystack = caseSensitive === false ? text.toLowerCase() : text;
+  const needle = caseSensitive === false ? normalizeForMatch(match).toLowerCase() : normalizeForMatch(match);
+  return needle && haystack.startsWith(needle);
+}
+
+function containsMatch(text, match, caseSensitive) {
+  const haystack = caseSensitive === false ? text.toLowerCase() : text;
+  const needle = caseSensitive === false ? normalizeForMatch(match).toLowerCase() : normalizeForMatch(match);
+  return needle && haystack.includes(needle);
+}
+
+function applyFilters(text, textConfig) {
+  for (const filter of textConfig?.startFilters ?? []) {
+    const match = filter?.match ?? filter;
+    if (matchesStart(text, match, filter?.caseSensitive)) {
+      throw new RequestError(403, '文本包含屏蔽内容');
+    }
+  }
+
+  const entrance = textConfig?.entranceFilter;
+  if (entrance?.prefix && Array.isArray(entrance.keywords)) {
+    if (matchesStart(text, entrance.prefix, entrance.caseSensitive)) {
+      const hit = entrance.keywords.some((keyword) => containsMatch(text, keyword, entrance.caseSensitive));
+      if (hit) throw new RequestError(403, '文本包含屏蔽内容');
+    }
+  }
+}
+
 export function cleanText(rawText, textConfig) {
   const cfg = textConfig ?? {};
   let text = String(rawText ?? '')
@@ -44,13 +91,15 @@ export function cleanText(rawText, textConfig) {
     }
   }
 
+  applyFilters(text, cfg);
+
   const maxLength = Number(cfg.maxTextLength) || 0;
   if (maxLength > 0 && text.length > maxLength) {
     text = text.slice(0, maxLength);
   }
 
-  for (const [from, to] of Object.entries(cfg.replacements ?? {})) {
-    if (from) text = text.split(from).join(String(to));
+  for (const [from, entry] of Object.entries(cfg.replacements ?? {})) {
+    text = applyReplacement(text, from, entry);
   }
 
   const result = text.trim();

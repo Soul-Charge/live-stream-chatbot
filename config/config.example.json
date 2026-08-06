@@ -9,13 +9,7 @@
     "maxTextLength": 200,
     "blockedWords": ["测试屏蔽词"],
     "blockedMode": "reject",
-    "replacements": {
-      "阿巴阿巴": "好的",
-      "（）": ""
-    },
-    "zhReplacements": {
-      "NTE0": "NTE零"
-    }
+    "replacements": {}
   },
   "roles": {
     "default": {

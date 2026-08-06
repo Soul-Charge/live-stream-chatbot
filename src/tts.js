@@ -1,20 +1,6 @@
 import { Readable } from 'node:stream';
 import { setTtsWeights } from './api.js';
 
-const JAPANESE_RE = /[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF\uFF66-\uFF9D]/;
-
-function hasJapanese(text) {
-  return JAPANESE_RE.test(String(text ?? ''));
-}
-
-function applyZhReplacements(text, textConfig) {
-  let result = String(text ?? '');
-  for (const [from, to] of Object.entries(textConfig?.zhReplacements ?? {})) {
-    if (from) result = result.split(from).join(String(to));
-  }
-  return result;
-}
-
 function modelKeyOf(params) {
   const gptPath = params?.gpt_path;
   const sovitsPath = params?.sovits_path;
@@ -102,8 +88,6 @@ export class TTSEngine {
     const endpoint = String(tts.endpoint ?? '/tts');
     const url = baseUrl + (endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
     const textLang = String(tts.textLang ?? 'auto').toLowerCase();
-    const isChineseMode = textLang === 'zh' || (textLang === 'auto' && !hasJapanese(text));
-    const speechText = isChineseMode ? applyZhReplacements(text, config.text) : text;
 
     const roleParams = role?.params ?? {};
     const modelKey = modelKeyOf(roleParams);
@@ -120,7 +104,7 @@ export class TTSEngine {
     }
 
     const payload = {
-      text: speechText,
+      text,
       text_lang: textLang,
       ref_audio_path: role?.refAudio ?? '',
       prompt_text: role?.refText ?? '',

@@ -1,0 +1,32 @@
+{
+  "replacements": {
+    "NTE0": "NTE零",
+    "LIOPPPPPPPP": "LIO八P",
+    "1849305599": "给木零",
+    "3538962": "NTE零"
+  },
+  "startFilters": [
+    {
+      "match": "已断开连接",
+      "caseSensitive": false
+    },
+    {
+      "match": "已成功连接至房间",
+      "caseSensitive": false
+    }
+  ],
+  "entranceFilter": {
+    "prefix": "欢迎",
+    "keywords": [
+      "ren汽",
+      "人汽",
+      "芬丝邱",
+      "芬-咝",
+      "粉咝邱",
+      "芬咝",
+      "在线人数邱",
+      "条顿武士团"
+    ],
+    "caseSensitive": false
+  }
+}

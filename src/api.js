@@ -24,34 +24,6 @@ export async function isTtsApiUp(baseUrl, timeoutMs = 2000) {
   }
 }
 
-async function requestJson(baseUrl, path, params, timeoutMs) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Number(timeoutMs) || 30000);
-  try {
-    const url = `${baseUrl}${path}?${new URLSearchParams(params)}`;
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error(`${path} 返回 ${response.status}: ${detail.slice(0, 200)}`);
-    }
-    return response;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-export async function setTtsWeights(baseUrl, gptPath, sovitsPath, timeoutMs = 180000, log = () => {}) {
-  const normalized = normalizeBaseUrl(baseUrl);
-  if (!gptPath || !sovitsPath) return false;
-
-  log('info', `设置推理模型 GPT: ${gptPath}`);
-  await requestJson(normalized, '/set_gpt_weights', { weights_path: gptPath }, timeoutMs);
-  log('info', `设置推理模型 SoVITS: ${sovitsPath}`);
-  await requestJson(normalized, '/set_sovits_weights', { weights_path: sovitsPath }, timeoutMs);
-  log('info', '推理模型设置完成');
-  return true;
-}
-
 function startTtsApi(gptSoVits, log) {
   const script = resolve(gptSoVits.path, gptSoVits.startScript || 'API.bat');
   log('info', `推理 API 未启动，正在启动: ${script}`);

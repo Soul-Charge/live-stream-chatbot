@@ -6,7 +6,7 @@ import { ConfigStore } from './config.js';
 import { RequestError, matchRole, parseRequest } from './request.js';
 import { TTSEngine } from './tts.js';
 import { PlayerQueue } from './player.js';
-import { ensureTtsApi, setTtsWeights } from './api.js';
+import { ensureTtsApi } from './api.js';
 
 const CONFIG_FILE = resolve('config', 'config.json');
 const EXAMPLE_FILE = resolve('config', 'config.example.json');
@@ -48,15 +48,21 @@ async function main() {
   store.watch();
 
   await ensureTtsApi(store.get(), log);
-  const ttsConfig = store.get().tts ?? {};
-  const defaultParams = store.get().roles?.default?.params ?? {};
-  await setTtsWeights(
-    ttsConfig.baseUrl,
-    defaultParams.gpt_path,
-    defaultParams.sovits_path,
-    Number(store.get().gptSoVits?.startupTimeoutMs) || 180000,
-    log,
-  );
+
+  const genieConfig = store.get().genie ?? {};
+  if (genieConfig.preloadRoles !== false) {
+    log('info', '开始预加载 Genie 角色...');
+    const preloadResults = await tts.preloadAll();
+    const failed = preloadResults.filter((result) => !result.ok);
+    if (failed.length > 0) {
+      log(
+        'error',
+        `角色预加载失败 ${failed.length}/${preloadResults.length}: ${failed.map((item) => item.key).join(', ')}`,
+      );
+    } else {
+      log('info', `角色预加载完成（${preloadResults.length} 个）`);
+    }
+  }
 
   const server = createServer(async (req, res) => {
     const config = store.get();
@@ -111,6 +117,7 @@ async function main() {
     server.close();
     store.close();
     player.close();
+    tts.dispose();
     setTimeout(() => process.exit(0), 300).unref();
   };
 

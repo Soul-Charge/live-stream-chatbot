@@ -1,6 +1,6 @@
 # Genie-TTS 引擎迁移实施计划
 
-> **执行状态（2026-08-11）**：阶段 0 ✅ 已完成、阶段 1 ✅ 已完成、阶段 2 ✅ 已完成。
+> **执行状态（2026-08-11）**：阶段 0 ✅ 已完成、阶段 1 ✅ 已完成、阶段 2 ✅ 已完成、阶段 3 ✅ 已完成。
 > 详细结果见《[阶段0-验证结果.md](阶段0-验证结果.md)》《[阶段1-转换记录.md](阶段1-转换记录.md)》。
 
 ## 1. 背景与目标
@@ -137,7 +137,25 @@
   `normalize_language` 只认 `zh` / `jp` / `en`，没有 `auto` / `mix`，
   中日混合文本需要中间件侧分句检测后决定交给哪个角色（阶段 3 预留该能力）。
 
-### 阶段 3：TTS 引擎适配
+### 阶段 3：TTS 引擎适配 ✅ 已完成（2026-08-11）
+
+执行结果摘要：
+
+- `src/tts.js` 已改造为 Genie 客户端：`load_character -> set_reference_audio -> /tts`，
+  合成 body 为 `{ character_name, text, split_sentence: true }`（可经 `tts.params` 覆盖），
+  音频流用 `Readable.fromWeb` 直接交给播放队列。
+- 支持预加载（`preloadAll`）、按需加载（`preloadRoles: false`）与空闲卸载
+  （`idleTimeoutMs` 到期后 `POST /unload_character`）。
+- `set_gpt_weights` / `set_sovits_weights` 相关逻辑已从 `tts.js`、`api.js`、`index.js` 移除。
+- **发现并修复 genie-tts 2.0.2 的 `LRUCacheDict` bug**：其继承 `OrderedDict` 并重写
+  `__getitem__`，而 `OrderedDict.popitem` 的 C 实现会经 `self[key]` 取值，容量不足触发
+  淘汰时抛 `KeyError` 并损坏内部状态（表现为多角色预加载后合成报 `KeyError: '<上一个角色>'`
+  并导致服务器进程退出）。修复位于 `scripts/start_genie_server.py` 的 `_apply_lru_fix()`，
+  用独立 `OrderedDict` 实现等价 LRU。
+- **端到端验证通过**：中间件预加载 5 角色完成；5 个角色各触发一次合成，
+  Genie 侧 5 条 `POST /tts 200`，无 KeyError / 加载失败 / “Missing model”。
+- 遗留（属阶段 5）：当前 `ffplay -i -` 按 WAV 头播放裸 PCM 会卡住，实测已确认，
+  阶段 5 必须改为 `-f s16le -ar 32000 -ac 1 -` 或在中间件补 WAV 头。
 
 将 `src/tts.js` 从“构造 GPT-SoVITS payload”改为 Genie 客户端：
 
@@ -178,7 +196,8 @@
 - 现有 `src/player.js` 已能把流桥接到 `ffplay`，大概率不需要大改。
 - **已确认**：Genie `/tts` 返回裸 PCM（32000 Hz、单声道、16bit），不带 WAV 头。
   ffplay 参数需改为 `-f s16le -ar 32000 -ac 1 -`，或在中间件为流补 WAV 头；
-  不能沿用当前 `ffplay -i -`（验证脚本已演示客户端补头写法）。
+  不能沿用当前 `ffplay -i -`（阶段 3 实测：`ffplay -i -` 遇到裸 PCM 会一直卡住；
+  验证脚本已演示客户端补头写法）。
 - 保留现有播放队列顺序，避免并发播放。
 
 ### 阶段 6：启动与守护
@@ -272,7 +291,9 @@ POST /clear_reference_audio_cache
 ## 6. 风险与待确认事项
 
 1. Genie-TTS 对当前 V2ProPlus 模型的 ONNX 转换兼容性。→ ✅ 已解决：5 个角色转换并合成通过。
-2. 多角色同时加载的内存占用是否可接受。→ ⚠️ 未解决：6GB 显存仅够单角色，采用按需加载/卸载。
+2. 多角色同时加载的内存占用是否可接受。→ ⚠️ 未解决：6GB 显存仅够单角色。
+   LRU bug 修复后 `maxCachedCharacters=1` 可正常工作，但同一时刻只缓存 1 个角色，
+   切换角色会触发服务端自动重载（约 8–23 秒）；阶段 4 需定策略（默认角色常驻 + 其余按需）。
 3. `/tts` 返回格式（WAV 头 / 裸 PCM）和采样率。→ ✅ 已解决：裸 PCM，32000 Hz / 单声道 / 16bit。
 4. 是否有健康检查接口，现有“启动前探测”需要适配。→ ✅ 已解决：无健康检查接口，用 TCP 探测。
 5. Genie 是否支持中日文混合文本自动识别；若不支持，需要为 `zh` 和 `jp` 分别准备角色。

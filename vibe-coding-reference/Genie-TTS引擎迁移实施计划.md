@@ -1,6 +1,7 @@
 # Genie-TTS 引擎迁移实施计划
 
-> **执行状态（2026-08-11）**：阶段 0 ✅、阶段 1 ✅、阶段 2 ✅、阶段 3 ✅、阶段 4 ✅ 均已完成。
+> **执行状态（2026-08-11）**：阶段 0-4 ✅、阶段 5 ✅ 均已完成（含真实直播间弹幕
+> 捕获合成验证）；阶段 6/7 未开始。
 > 详细结果见《[阶段0-验证结果.md](阶段0-验证结果.md)》《[阶段1-转换记录.md](阶段1-转换记录.md)》。
 
 ## 1. 背景与目标
@@ -139,6 +140,10 @@
 - `textLang` 决策：当前锁定 `"zh"`；后续取值 `"jp"` 或混合模式。注意 Genie 的
   `normalize_language` 只认 `zh` / `jp` / `en`，没有 `auto` / `mix`，
   中日混合文本需要中间件侧分句检测后决定交给哪个角色（阶段 3 预留该能力）。
+- **语言路由（2026-08-11 已实现并修订）**：弹幕含平假名/片假名 → `jp`，否则 → `zh`；
+  `src/tts.js` 把检测结果作为每次 `/tts` 请求的 `language` 字段传给 Genie。
+  角色本身只以 native 语言（`role.language`，当前均为 `jp`）加载一次，不再派生
+  `ema_zh` 这类双变体（早期方案已废弃，原因见阶段 5 根因）。
 
 ### 阶段 3：TTS 引擎适配 ✅ 已完成（2026-08-11）
 
@@ -155,9 +160,11 @@
   淘汰时抛 `KeyError` 并损坏内部状态（表现为多角色预加载后合成报 `KeyError: '<上一个角色>'`
   并导致服务器进程退出）。修复位于 `scripts/start_genie_server.py` 的 `_apply_lru_fix()`，
   用独立 `OrderedDict` 实现等价 LRU。
-- **端到端验证通过**：中间件预加载 5 角色完成；5 个角色各触发一次合成，
-  Genie 侧 5 条 `POST /tts 200`，无 KeyError / 加载失败 / “Missing model”。
-  该验证在 GPU 推理下完成；推理改回 CPU 后已用 hiro 角色复测合成成功（约 4 秒音频）。
+- **接口链路验证通过（不包含内容正确性）**：中间件预加载 5 角色完成；
+  5 个角色各触发一次合成，Genie 侧 5 条 `POST /tts 200`，无 KeyError / 加载失败 /
+  “Missing model”。该验证在 GPU 推理下完成；推理改回 CPU 后已用 hiro 角色复测
+  合成成功（约 4 秒音频）。此验证只确认“流非空”，未听测内容；后续发现
+  合成内容实为参考文本语音（见阶段 5 根因）。
 - 遗留（属阶段 5）：当前 `ffplay -i -` 按 WAV 头播放裸 PCM 会卡住，实测已确认，
   阶段 5 必须改为 `-f s16le -ar 32000 -ac 1 -` 或在中间件补 WAV 头。
 
@@ -213,23 +220,76 @@
   - `POST /clear_reference_audio_cache`
   - `POST /stop`
 
-### 阶段 5：流式播放适配
+### 阶段 5：流式播放适配 ✅ 已完成（2026-08-11，含真实弹幕验证）
+
+执行结果摘要（已完成部分）：
+
+- **ffplay 参数（已确认）**：`["-nodisp","-autoexit","-loglevel","quiet","-f","s16le","-ar","32000","-ch_layout","mono","-"]`。
+  注意：本机 ffplay 构建（BtbN 20250716）**不认 `-ac 1`**（报 `Option not found`），
+  正确写法是 `-ch_layout mono`；`-ar 32000` 正常。
+- 播放器 `player.js` 无需改动（配置热重载后立即生效），播放队列顺序保留。
+- 单元测试（`scripts/phase5_player_test.mjs`）：2 秒静音裸 PCM 经 PlayerQueue 正常播放完毕，
+  无错误、不卡住。
+- 端到端测试（`scripts/phase5_e2e_test.mjs`）：预加载完成先于 7788 监听；
+  触发 2 个角色合成并实际播放成功，Genie `/tts` 200 ×2、TTS 失败 0、播放器错误 0。
+  该测试只验证“流能放出来”，**未验证合成内容**。
+- **顺带修复启动竞态**：中间件可能在 Genie 尚未就绪时开始预加载导致静默失败；
+  `TTSEngine.loadCharacter` 现对网络错误自动重试（最多 3 次、退避 1.5s/3s/4.5s），
+  并在后端未确认就绪时打印警告。
+
+**根因（2026-08-11 定位并修复）**
+
+- 现象：同一角色不同中文文本输出字节数几乎不变（ema_zh 均约 490KB / 7.7s），
+  时长与参考音频几乎一致（ema 参考 7.35s、hiro 参考 5.97s），听感为参考文本的
+  日语语音，目标文本未参与合成。
+- 根因：`ema_zh` 这类变体把参考音频也按 `language=zh` 处理，而参考文本是日语；
+  日文参考文本走中文 G2P 只产生 13 个错误音素（正确日语 G2P 为 83 个），
+  encoder 的文本条件被破坏，模型退化为复读参考音频。
+- 修复方案：
+  - 角色始终以 native 语言（`jp`）`load_character` + `set_reference_audio`，
+    参考音素序列保持正确（83 个）。
+  - 中间件按弹幕检测 `zh` / `jp`，在 `/tts` 请求里传 `language`；
+    `TTSPlayer` 把该语言用于目标文本的 G2P（`GetPhonesAndBert`），
+    不再依赖加载角色时的固定语言。
+  - `ReferenceAudio` 缓存键同时考虑文本与语言，避免同参考音频在 zh/jp 间
+    切换时复用错误音素。
+- 涉及文件：`.venv-genie/.../Server.py`（`/tts` 接受可选 `language`）、
+  `TTSPlayer.py`（会话级语言）、`ReferenceAudio.py`（缓存按语言刷新）、
+  `src/tts.js` / `src/index.js` / `config.json`（去掉 `_zh` 变体与
+  `preloadLanguage`，改为请求级语言）。
+- 验证：独立 8010 实例上 ema/hiro 中文、日语合成均随文本变化，不再复读参考音频；
+  正式实例重启后用户实际捕获直播间弹幕并正确合成、听测通过。
+
+- 早期已应用的修复（均在 `.venv-genie` 内，重启 Genie 后生效）：
+  - **RoBERTa 缺失**：首次下载的 `GenieData/` 缺 `RoBERTa/RoBERTa.onnx`（约 599MB），
+    中文合成无文本条件，表现为胡言乱语/时长与文本无关；已从
+    `F:\AiSound\Genie-TTS GUI\GenieData\RoBERTa` 复制到项目 `GenieData/RoBERTa/`
+    （含 `RoBERTa.onnx` 与 `roberta_tokenizer/`）。
+  - **BERT 对齐**：`GetPhonesAndBert.py` 中文分支在 `text_bert.shape[0] != len(phones)`
+    时截断/补零（修复 `/encoder/Add` 的 “18 by 19” 广播崩溃）；保留作防御。
+  - **流结束修复**：`Server.py` 后台 TTS 异常时 `chunk_callback(None)`，
+    避免客户端（ffplay）永久挂起。
+- 收尾清理（已完成）：移除 `src/player.js` 调试日志；删除 `scripts/tmp_*`
+  临时脚本与 `logs/listen_check/`、`logs/*.pcm` 临时音频；venv 补丁记录见本阶段。
 
 - 现有 `src/player.js` 已能把流桥接到 `ffplay`，大概率不需要大改。
 - **已确认**：Genie `/tts` 返回裸 PCM（32000 Hz、单声道、16bit），不带 WAV 头。
-  ffplay 参数需改为 `-f s16le -ar 32000 -ac 1 -`，或在中间件为流补 WAV 头；
+  ffplay 参数需改为 `-f s16le -ar 32000 -ch_layout mono -`（本机 ffplay 不认 `-ac 1`），
+  或在中间件为流补 WAV 头；
   不能沿用当前 `ffplay -i -`（阶段 3 实测：`ffplay -i -` 遇到裸 PCM 会一直卡住；
   验证脚本已演示客户端补头写法）。
 - 保留现有播放队列顺序，避免并发播放。
 
 ### 阶段 6：启动与守护
 
+- **当前状态**：独立启动入口 `scripts/start_genie_server.py` 已就绪（CPU/GPU 探测、
+  LRU 修复、读 `config.json` 的 `genie` 配置块）；但 `src/api.js` 的 `ensureTtsApi`
+  仍读旧 `gptSoVits.path / API.bat` 逻辑，`isTtsApiUp` 仍 GET `/`，尚未接入 Genie。
 - 将 `src/api.js` 中启动 GPT-SoVITS `API.bat` 的逻辑改为启动 Genie 服务器：
   - 推荐用独立 Python 脚本调用 `genie.start_server(host, port, workers=1)`。
   - 启动脚本同样使用 `.\.venv-genie\Scripts\python.exe` 运行，确保加载的是项目内虚拟环境的 `genie_tts`。
-  - 启动脚本需在 `import genie_tts` 前加入 nvidia DLL 路径，并设置
-    `model_manager.providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]`
-    （可参考 `scripts/phase0_verify.py` 的 `run_server` 实现）。
+  - 健康探测改为 TCP 连接或 `GET /openapi.json`（Genie 无专用 health 接口）。
+  - `autoStart=false` 时只探测不拉起；拉起命令与超时/轮询参数读 `genie` 配置块。
   - 保留“检查后端是否已启动，未启动则拉起并等待就绪”的现有机制。
 - 启动顺序：
   1. 检查 Genie 服务器
@@ -240,6 +300,7 @@
 
 - 功能验证：
   - 每个角色用 `角色名说...` 触发，确认声音正确
+  - **合成内容与目标文本一致（不能只看“有声音”）**
   - 文本替换、开头过滤、机器人进场过滤仍生效
   - 中日文文本合成符合预期
   - 连续切换角色无崩溃、无断流
@@ -319,10 +380,15 @@ POST /clear_reference_audio_cache
 3. `/tts` 返回格式（WAV 头 / 裸 PCM）和采样率。→ ✅ 已解决：裸 PCM，32000 Hz / 单声道 / 16bit。
 4. 是否有健康检查接口，现有“启动前探测”需要适配。→ ✅ 已解决：无健康检查接口，用 TCP 探测。
 5. Genie 是否支持中日文混合文本自动识别；若不支持，需要为 `zh` 和 `jp` 分别准备角色。
-   → 已确认 Genie 仅支持 `zh` / `jp` / `en`，无 `auto` / `mix`；当前 `textLang` 锁定 `zh`，
-   日语与中日混合支持在阶段 3 中间件侧按句检测实现（配置字段已预留）。
+   → ✅ 已解决：Genie 仅支持 `zh` / `jp` / `en`，无 `auto` / `mix`；
+   已实现简单的弹幕级语言分类（含平假名/片假名 → jp，否则 → zh），
+   通过角色双语变体（`ema` / `ema_zh`）路由；句内混排暂不拆分（整条弹幕按检测结果走）。
 6. 热重载角色配置时，已加载角色是否需要重新 `load_character` / `set_reference_audio`。→ 待阶段 2 实现时确认。
 7. 参考音频是否必须为 5 秒左右；现有角色的 `.ogg` / `.mp3` 格式与时长是否需要统一转换。
    → ✅ 已确认：时长 3.3–7.4 秒均可正常合成；`.mp3` 必须转 `.wav`（已转换），其余保持原格式。
 8. 项目内虚拟环境体积较大（尤其 torch 与 genie-tts），需预留磁盘空间，并避免将其纳入备份、同步或版本库。
    → ✅ 已处理：`.venv-genie/`、`.pip-cache/`、`GenieData/` 均已加入 `.gitignore`。
+9. 合成内容是否真正跟随目标文本。→ ✅ 已解决（真实弹幕验证通过）：根因是参考音频被
+   错误地按中文 G2P 处理（日语参考文本只剩 13 个错误音素），encoder 文本条件失效、
+   模型复读参考音频；已改为角色按 native 语言加载、`/tts` 按请求传 `language`
+   （见阶段 5 根因）。

@@ -61,7 +61,7 @@ export const DEFAULT_CONFIG = {
   },
   player: {
     command: 'ffplay',
-    args: ['-nodisp', '-autoexit', '-loglevel', 'quiet', '-i', '-'],
+    args: ['-nodisp', '-autoexit', '-loglevel', 'quiet', '-f', 's16le', '-ar', '32000', '-ch_layout', 'mono', '-'],
   },
   log: {
     level: 'info',

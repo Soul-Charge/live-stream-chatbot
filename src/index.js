@@ -47,11 +47,14 @@ async function main() {
   });
   store.watch();
 
-  await ensureTtsApi(store.get(), log);
+  const apiState = await ensureTtsApi(store.get(), log);
+  if (!apiState.running) {
+    log('warn', '推理后端未确认就绪，预加载将自动重试');
+  }
 
   const genieConfig = store.get().genie ?? {};
   if (genieConfig.preloadRoles !== false) {
-    log('info', '开始预加载 Genie 角色...');
+    log('info', '开始预加载 Genie 角色（native 语言，合成时按弹幕检测 zh/jp）...');
     const preloadResults = await tts.preloadAll();
     const failed = preloadResults.filter((result) => !result.ok);
     if (failed.length > 0) {

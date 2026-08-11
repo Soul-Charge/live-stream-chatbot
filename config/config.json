@@ -32,7 +32,7 @@
     },
     "塰歪比巴B": {
       "comment": "高松灯",
-      "refAudio": "F:/AiSound/训练文件/自整理用音频/tomori/新しい模様の見つけたから。買ったのを、整理しようと思って…….ogg",
+      "refAudio": "F:/AiSound/训练文件/自整理用音频/tomori/新しい模様の見つけたから。買ったのを、整理しようと思って…….mp3",
       "refText": "新しい模様の見つけたから。買ったのを、整理しようと思って……",
       "params": {
         "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/MyGO_高松灯_v2pp.ckpt",

@@ -148,11 +148,11 @@ export class TTSEngine {
     this.#loaded.add(name);
   }
 
-  async unloadCharacter(characterName) {
+  async unloadCharacter(characterName, timeoutMs = 30000) {
     if (!characterName || !this.#loaded.has(characterName)) return;
     this.#clearIdleTimer(characterName);
     try {
-      await this.#postJson('/unload_character', { character_name: characterName }, 30000);
+      await this.#postJson('/unload_character', { character_name: characterName }, timeoutMs);
       this.#log('info', `Genie 卸载角色: ${characterName}`);
     } finally {
       this.#loaded.delete(characterName);
@@ -172,6 +172,35 @@ export class TTSEngine {
       }
     }
     return results;
+  }
+
+  /**
+   * 关闭中间件时的 Genie 清理流程：
+   * 1. 逐个 /unload_character 卸载已加载角色
+   * 2. /clear_reference_audio_cache 清参考音频缓存
+   * 3. /stop 停止合成任务
+   */
+  async shutdown() {
+    const loaded = [...this.#loaded];
+    for (const name of loaded) {
+      try {
+        await this.unloadCharacter(name, 3000);
+      } catch (err) {
+        this.#log('warn', `角色 ${name} 卸载失败: ${err.message}`);
+      }
+    }
+    for (const [path, payload] of [
+      ['/clear_reference_audio_cache', {}],
+      ['/stop', {}],
+    ]) {
+      try {
+        await this.#postJson(path, payload, 5000);
+        this.#log('info', `Genie ${path} 已执行`);
+      } catch (err) {
+        this.#log('warn', `Genie ${path} 失败: ${err.message}`);
+      }
+    }
+    this.dispose();
   }
 
   enqueue(text, role) {

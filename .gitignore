@@ -148,3 +148,7 @@ vite.config.ts.timestamp-*
 
 # Genie-TTS runtime resources downloaded on first import (~391 MB)
 GenieData/
+
+# Python bytecode cache
+__pycache__/
+*.pyc

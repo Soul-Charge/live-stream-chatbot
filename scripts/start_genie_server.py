@@ -13,7 +13,10 @@
 import json
 import os
 import sys
-from collections import OrderedDict
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import genie_fixes
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -53,76 +56,8 @@ _prepare_nvidia_dlls()
 import genie_tts as genie
 
 
-class _FixedLRUCacheDict:
-    """
-    修复 genie_tts 2.0.2 的 LRUCacheDict 淘汰 bug：
-
-    原实现继承 OrderedDict 并重写 __getitem__，而 OrderedDict.popitem 的 C 实现
-    会以 self[key] 的方式取值，淘汰时触发已移除键的 KeyError，并损坏内部状态
-    （例如容量 1 时插入第二个键直接抛 KeyError('第一个键')，且 'in' 判断仍为 True）。
-
-    这里改用独立的 OrderedDict 实现等价 LRU 语义，不干扰 OrderedDict 的 C 方法。
-    """
-
-    def __init__(self, capacity):
-        self.capacity = max(1, int(capacity))
-        self._data = OrderedDict()
-
-    def __contains__(self, key):
-        return key in self._data
-
-    def __len__(self):
-        return len(self._data)
-
-    def __iter__(self):
-        return iter(self._data)
-
-    def __getitem__(self, key):
-        value = self._data.pop(key)
-        self._data[key] = value  # 访问后移到末尾
-        return value
-
-    def __setitem__(self, key, value):
-        if key in self._data:
-            del self._data[key]
-        self._data[key] = value
-        while len(self._data) > self.capacity:
-            self._data.popitem(last=False)  # 删除最旧的
-
-    def __delitem__(self, key):
-        del self._data[key]
-
-    def get(self, key, default=None):
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def clear(self):
-        self._data.clear()
-
-    def keys(self):
-        return self._data.keys()
-
-    def values(self):
-        return self._data.values()
-
-    def items(self):
-        return self._data.items()
-
-    def __repr__(self):
-        return repr(self._data)
-
-
-def _apply_lru_fix():
-    from genie_tts import ModelManager as mm
-
-    # 直接替换已创建 singleton 的缓存属性（Server/Internal 引用的都是这个实例）
-    mm.model_manager.character_to_model = _FixedLRUCacheDict(MAX_CACHED)
-    print(f"[genie] LRUCacheDict bug 修复已应用 (capacity={MAX_CACHED})")
-
-
-_apply_lru_fix()
+genie_fixes.apply_lru_fix(MAX_CACHED)
+print(f"[genie] LRUCacheDict bug 修复已应用 (capacity={MAX_CACHED})")
 
 
 def cuda_is_usable() -> bool:

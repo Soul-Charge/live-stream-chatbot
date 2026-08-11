@@ -110,15 +110,22 @@ async function main() {
   });
 
   let shuttingDown = false;
-  const shutdown = () => {
+  const shutdown = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
     log('info', '正在关闭服务...');
     server.close();
     store.close();
     player.close();
-    tts.dispose();
-    setTimeout(() => process.exit(0), 300).unref();
+    const exitTimer = setTimeout(() => process.exit(0), 15000);
+    exitTimer.unref();
+    try {
+      await tts.shutdown();
+    } catch (err) {
+      log('error', `Genie 关闭清理失败: ${err.message}`);
+    }
+    clearTimeout(exitTimer);
+    process.exit(0);
   };
 
   process.on('SIGINT', shutdown);

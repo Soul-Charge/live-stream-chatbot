@@ -42,7 +42,7 @@ export const DEFAULT_CONFIG = {
     startupTimeoutMs: 180000,
     pollIntervalMs: 2000,
     preloadRoles: true,
-    maxCachedCharacters: 1,
+    maxCachedCharacters: 5,
     idleTimeoutMs: 600000,
     useGpu: false,
   },

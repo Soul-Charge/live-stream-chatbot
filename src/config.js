@@ -44,7 +44,7 @@ export const DEFAULT_CONFIG = {
     preloadRoles: true,
     maxCachedCharacters: 1,
     idleTimeoutMs: 600000,
-    useGpu: true,
+    useGpu: false,
   },
   tts: {
     baseUrl: 'http://127.0.0.1:9880',

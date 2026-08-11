@@ -35,9 +35,12 @@
   命令为 `D:\Python310\python.exe -m venv .venv-genie`。
 - 已安装 genie-tts 2.0.2、torch、onnxruntime-gpu 1.22.0（GPU 版无 1.22.1），
   以及 nvidia CUDA 12.9 / cuDNN 9.24 运行时；首次导入自动下载 `GenieData/`（约 391MB）。
-- GPU 启用要点：genie_tts.ModelManager 硬编码 CPU provider，需在服务器启动前改为
-  `CUDAExecutionProvider`；Windows 下还需先把 `site-packages\nvidia\*\bin` 加入
-  DLL 搜索路径，否则会静默回退 CPU（详见验证脚本 `run_server`）。
+- GPU 启用要点（2026-08-11 已回退 CPU，以下仅作历史记录）：genie_tts.ModelManager
+  硬编码 CPU provider，需在服务器启动前改为 `CUDAExecutionProvider`；Windows 下还需
+  先把 `site-packages\nvidia\*\bin` 加入 DLL 搜索路径。
+- **推理已改回 CPU（2026-08-11，用户决定）**：`genie.useGpu=false`；
+  onnxruntime-gpu 1.22.0 与 nvidia CUDA/cuDNN 运行时已卸载，恢复
+  onnxruntime 1.22.1（CPU，genie-tts 锁定版本），不再占用显存。
 - 已确认 `/tts` 返回裸 PCM（32000 Hz、单声道、16bit），并非带 WAV 头的流。
 - 已确认没有健康检查接口，采用 TCP 探测端口就绪。
 
@@ -154,6 +157,7 @@
   用独立 `OrderedDict` 实现等价 LRU。
 - **端到端验证通过**：中间件预加载 5 角色完成；5 个角色各触发一次合成，
   Genie 侧 5 条 `POST /tts 200`，无 KeyError / 加载失败 / “Missing model”。
+  该验证在 GPU 推理下完成；推理改回 CPU 后已用 hiro 角色复测合成成功（约 4 秒音频）。
 - 遗留（属阶段 5）：当前 `ffplay -i -` 按 WAV 头播放裸 PCM 会卡住，实测已确认，
   阶段 5 必须改为 `-f s16le -ar 32000 -ac 1 -` 或在中间件补 WAV 头。
 
@@ -177,9 +181,10 @@
 - **已知陷阱**：`/load_character` 即使模型加载失败也返回 200（服务端不检查
   `model_manager.load_character` 的返回值）。预加载后必须用 `/tts` 探测或
   检查服务端日志确认角色可用，不能只信 HTTP 状态码。
-- **显存限制（已实测）**：RTX 2060 6GB 显存，单角色 GPU 加载峰值约 5.4GB
-  （含常驻程序约 2.4GB），多角色同时 GPU 预加载不可行。
-  阶段 4 采用“仅缓存 1 个角色（`Max_Cached_Character_Models=1`）+ 按需加载/卸载”。
+- **推理方式（2026-08-11 修订）**：已改回 CPU 推理（`genie.useGpu=false`），
+  显存不再是瓶颈；多角色预加载改为评估内存（RAM）占用。
+  阶段 4 仍建议“仅缓存 1 个角色（`Max_Cached_Character_Models=1`）+ 按需加载/卸载”，
+  是否扩大缓存容量需以 CPU 实测内存为准。
 - 中间件启动时遍历 `config.json` 中 `roles` 下所有角色，逐个执行：
   - `POST /load_character`
   - `POST /set_reference_audio`
@@ -291,9 +296,10 @@ POST /clear_reference_audio_cache
 ## 6. 风险与待确认事项
 
 1. Genie-TTS 对当前 V2ProPlus 模型的 ONNX 转换兼容性。→ ✅ 已解决：5 个角色转换并合成通过。
-2. 多角色同时加载的内存占用是否可接受。→ ⚠️ 未解决：6GB 显存仅够单角色。
-   LRU bug 修复后 `maxCachedCharacters=1` 可正常工作，但同一时刻只缓存 1 个角色，
-   切换角色会触发服务端自动重载（约 8–23 秒）；阶段 4 需定策略（默认角色常驻 + 其余按需）。
+2. 多角色同时加载的内存占用是否可接受。→ ⚠️ 待实测：推理已改回 CPU，
+   显存不再是瓶颈，改为评估 RAM 占用。LRU bug 修复后 `maxCachedCharacters=1`
+   可正常工作，切换角色会触发服务端自动重载（GPU 时约 8–23 秒，CPU 待实测）；
+   阶段 4 需定策略（默认角色常驻 + 其余按需，或按内存实测放宽缓存容量）。
 3. `/tts` 返回格式（WAV 头 / 裸 PCM）和采样率。→ ✅ 已解决：裸 PCM，32000 Hz / 单声道 / 16bit。
 4. 是否有健康检查接口，现有“启动前探测”需要适配。→ ✅ 已解决：无健康检查接口，用 TCP 探测。
 5. Genie 是否支持中日文混合文本自动识别；若不支持，需要为 `zh` 和 `jp` 分别准备角色。

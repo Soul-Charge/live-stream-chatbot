@@ -24,7 +24,7 @@ with open(CONFIG_PATH, "r", encoding="utf-8") as f:
 
 HOST = str(genie_cfg.get("host", "127.0.0.1"))
 PORT = int(genie_cfg.get("port", 8000))
-USE_GPU = bool(genie_cfg.get("useGpu", True))
+USE_GPU = bool(genie_cfg.get("useGpu", False))
 MAX_CACHED = int(genie_cfg.get("maxCachedCharacters", 1))
 
 os.environ["Max_Cached_Character_Models"] = str(MAX_CACHED)
@@ -130,6 +130,9 @@ def cuda_is_usable() -> bool:
     import onnxruntime
     from onnx import TensorProto, helper
 
+    if "CUDAExecutionProvider" not in onnxruntime.get_available_providers():
+        return False
+
     node = helper.make_node("Identity", ["X"], ["Y"])
     graph = helper.make_graph(
         [node],
@@ -150,7 +153,10 @@ def cuda_is_usable() -> bool:
 def main():
     from genie_tts.ModelManager import model_manager
 
-    if USE_GPU and cuda_is_usable():
+    if not USE_GPU:
+        model_manager.providers = ["CPUExecutionProvider"]
+        print("[genie] CPU inference (useGpu=false)")
+    elif cuda_is_usable():
         model_manager.providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         print(f"[genie] GPU OK: CUDAExecutionProvider (onnxruntime {__import__('onnxruntime').__version__})")
     else:

@@ -1,6 +1,6 @@
 # Genie-TTS 引擎迁移实施计划
 
-> **执行状态（2026-08-11）**：阶段 0 ✅ 已完成、阶段 1 ✅ 已完成。
+> **执行状态（2026-08-11）**：阶段 0 ✅ 已完成、阶段 1 ✅ 已完成、阶段 2 ✅ 已完成。
 > 详细结果见《[阶段0-验证结果.md](阶段0-验证结果.md)》《[阶段1-转换记录.md](阶段1-转换记录.md)》。
 
 ## 1. 背景与目标
@@ -69,7 +69,7 @@
   （与 Genie-TTS GUI 结构一致），参考音频放入同目录下 `prompt_wav/`，
   并生成 `prompt_wav.json`。
 - 发现并修正：高松灯参考音频实际为 `.mp3`（配置曾写 `.ogg`）；
-  MyGO 与 诗歌剧 的 mp3 参考音频已用 ffmpeg 转为 wav（Genie 不接受 mp3）。
+  高松灯与 诗歌剧 的 mp3 参考音频已用 ffmpeg 转为 wav（Genie 不接受 mp3）。
 
 - 为每个角色执行 ONNX 转换，建议脚本统一遍历模型目录：
   - 输入：`GPT_weights_v2ProPlus/<角色>.ckpt`
@@ -96,9 +96,24 @@
   - `refAudio`
   - `refText`
 - 参考音频建议使用 5 秒左右的片段；转换或运行期间内存过高时，可调用 `/unload_character` 释放已加载角色。
-- 首批转换对象：樱羽艾玛（ema）、二阶堂希罗（hiro）、高松灯（MyGO）、诗歌剧、橘雪莉（sherry）。
+- 首批转换对象：樱羽艾玛（ema）、二阶堂希罗（hiro）、高松灯（当时目录名 MyGO，
+  阶段 2 已更名为 tomori）、诗歌剧、橘雪莉（sherry）。
 
-### 阶段 2：配置结构改造
+### 阶段 2：配置结构改造 ✅ 已完成（2026-08-11）
+
+执行结果摘要：
+
+- `config/config.json`（及 `config.example.json`、`src/config.js` 默认值）已改造：
+  - 每个角色新增 `characterName` / `onnxModelDir` / `language` 字段，
+    `refAudio` 统一指向转换后的 `CharacterModels/<角色>/prompt_wav/` 文件。
+  - `gptSoVits` 配置块替换为 `genie` 块（host/port、autoStart、startScript、
+    preloadRoles、maxCachedCharacters、useGpu），旧 `params`（gpt/sovits 路径）保留作回滚。
+  - `tts.baseUrl` 改为 `http://127.0.0.1:8000`。
+- **角色更名**：高松灯的 `characterName` / 目录由 `MyGO` 改为 `tomori`，
+  F 盘目录、`config.json`、`convert_to_onnx.py`、阶段 1 记录已同步。
+- **合成语言**：`tts.textLang` 当前锁定为 `"zh"`（中文）。
+  已为后续预留：每个角色保留 `language` 字段（当前均为 `jp`，匹配模型与参考音频），
+  后续可支持 `textLang: "jp"`（日语）与混合语言（见风险 5）。
 
 在 `config/config.json` 的每个角色下增加或替换字段：
 
@@ -114,11 +129,13 @@
 ```
 
 - `characterName` 与 `onnxModelDir` 以《阶段1-转换记录.md》为准：
-  ema / hiro / MyGO / 诗歌剧 / sherry（ONNX 文件位于 `<角色>/tts_models`）。
+  ema / hiro / tomori / 诗歌剧 / sherry（ONNX 文件位于 `<角色>/tts_models`）。
 - 参考音频一律使用 `prompt_wav/` 下的文件（mp3 已转 wav），不要再指向源 mp3。
 - `tts` 配置改为 Genie 服务器地址，例如 `baseUrl: http://127.0.0.1:8000`。
 - `gptSoVits` 相关配置改为 `genie` 配置：服务器端口、启动脚本/命令、角色预加载开关。
-- `textLang` 的 `auto` 语义需要重新评估：Genie 按角色语言工作，可能需要为中日混合场景准备独立的 `zh` / `jp` 角色，或确认 Genie 是否支持按文本自动识别。
+- `textLang` 决策：当前锁定 `"zh"`；后续取值 `"jp"` 或混合模式。注意 Genie 的
+  `normalize_language` 只认 `zh` / `jp` / `en`，没有 `auto` / `mix`，
+  中日混合文本需要中间件侧分句检测后决定交给哪个角色（阶段 3 预留该能力）。
 
 ### 阶段 3：TTS 引擎适配
 
@@ -259,6 +276,8 @@ POST /clear_reference_audio_cache
 3. `/tts` 返回格式（WAV 头 / 裸 PCM）和采样率。→ ✅ 已解决：裸 PCM，32000 Hz / 单声道 / 16bit。
 4. 是否有健康检查接口，现有“启动前探测”需要适配。→ ✅ 已解决：无健康检查接口，用 TCP 探测。
 5. Genie 是否支持中日文混合文本自动识别；若不支持，需要为 `zh` 和 `jp` 分别准备角色。
+   → 已确认 Genie 仅支持 `zh` / `jp` / `en`，无 `auto` / `mix`；当前 `textLang` 锁定 `zh`，
+   日语与中日混合支持在阶段 3 中间件侧按句检测实现（配置字段已预留）。
 6. 热重载角色配置时，已加载角色是否需要重新 `load_character` / `set_reference_audio`。→ 待阶段 2 实现时确认。
 7. 参考音频是否必须为 5 秒左右；现有角色的 `.ogg` / `.mp3` 格式与时长是否需要统一转换。
    → ✅ 已确认：时长 3.3–7.4 秒均可正常合成；`.mp3` 必须转 `.wav`（已转换），其余保持原格式。

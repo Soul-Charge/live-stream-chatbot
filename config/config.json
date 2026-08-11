@@ -14,7 +14,10 @@
   "roles": {
     "default": {
       "comment": "樱羽艾玛",
-      "refAudio": "F:/AiSound/训练文件/自整理用音频/ema/0101Adv08_Ema007.ogg",
+      "characterName": "ema",
+      "onnxModelDir": "F:/AiSound/Genie-TTS-onnx/CharacterModels/ema/tts_models",
+      "language": "jp",
+      "refAudio": "F:/AiSound/Genie-TTS-onnx/CharacterModels/ema/prompt_wav/0101Adv08_Ema007.ogg",
       "refText": "あの、その看守のことなんだけど……ボク、さっきアリサちゃんが捕まっちゃってるの見ちゃって……。",
       "params": {
         "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/ema-e15.ckpt",
@@ -23,7 +26,10 @@
     },
     "NTE0": {
       "comment": "二阶堂希罗",
-      "refAudio": "F:/AiSound/训练文件/自整理用音频/hiro/0101Adv02_Hiro003.ogg",
+      "characterName": "hiro",
+      "onnxModelDir": "F:/AiSound/Genie-TTS-onnx/CharacterModels/hiro/tts_models",
+      "language": "jp",
+      "refAudio": "F:/AiSound/Genie-TTS-onnx/CharacterModels/hiro/prompt_wav/0101Adv02_Hiro003.ogg",
       "refText": "正しい説明がなされるのかな。それなら早く向かわないと……。",
       "params": {
         "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/hiro-e15.ckpt",
@@ -32,7 +38,10 @@
     },
     "塰歪比巴B": {
       "comment": "高松灯",
-      "refAudio": "F:/AiSound/训练文件/自整理用音频/tomori/新しい模様の見つけたから。買ったのを、整理しようと思って…….mp3",
+      "characterName": "tomori",
+      "onnxModelDir": "F:/AiSound/Genie-TTS-onnx/CharacterModels/tomori/tts_models",
+      "language": "jp",
+      "refAudio": "F:/AiSound/Genie-TTS-onnx/CharacterModels/tomori/prompt_wav/新しい模様の見つけたから。買ったのを、整理しようと思って…….wav",
       "refText": "新しい模様の見つけたから。買ったのを、整理しようと思って……",
       "params": {
         "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/MyGO_高松灯_v2pp.ckpt",
@@ -41,7 +50,10 @@
     },
     "聪明露娜": {
       "comment": "诗歌剧",
-      "refAudio": "F:/AiSound/训练文件/自整理用音频/曼波诗歌剧/マチカネタンホイザです！よろよろです～♪.mp3",
+      "characterName": "诗歌剧",
+      "onnxModelDir": "F:/AiSound/Genie-TTS-onnx/CharacterModels/诗歌剧/tts_models",
+      "language": "jp",
+      "refAudio": "F:/AiSound/Genie-TTS-onnx/CharacterModels/诗歌剧/prompt_wav/マチカネタンホイザです！よろよろです～♪.wav",
       "refText": "マチカネタンホイザです！よろよろです～♪",
       "params": {
         "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/诗歌剧.ckpt",
@@ -50,7 +62,10 @@
     },
     "可见性实验": {
       "comment": "橘雪莉",
-      "refAudio": "F:/AiSound/训练文件/自整理用音频/sherry/0101Adv08_Sherry008.ogg",
+      "characterName": "sherry",
+      "onnxModelDir": "F:/AiSound/Genie-TTS-onnx/CharacterModels/sherry/tts_models",
+      "language": "jp",
+      "refAudio": "F:/AiSound/Genie-TTS-onnx/CharacterModels/sherry/prompt_wav/0101Adv08_Sherry008.ogg",
       "refText": "私もエマさんと同じですよ。魔法なんて初めて知りましたし、使えません。",
       "params": {
         "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/sherry-e15.ckpt",
@@ -58,19 +73,23 @@
       }
     }
   },
-  "gptSoVits": {
-    "path": "F:/AiSound/GPT-SoVITS-v2pro-20250604",
+  "genie": {
+    "host": "127.0.0.1",
+    "port": 8000,
     "autoStart": true,
-    "startScript": "API.bat",
+    "startScript": "scripts/start_genie_server.py",
     "startupTimeoutMs": 180000,
-    "pollIntervalMs": 2000
+    "pollIntervalMs": 2000,
+    "preloadRoles": true,
+    "maxCachedCharacters": 1,
+    "useGpu": true
   },
   "tts": {
-    "baseUrl": "http://127.0.0.1:9880",
+    "baseUrl": "http://127.0.0.1:8000",
     "endpoint": "/tts",
     "concurrency": 1,
     "requestTimeoutMs": 30000,
-    "textLang": "auto",
+    "textLang": "zh",
     "promptLang": "ja",
     "textSplitMethod": "cut0",
     "batchSize": 1,

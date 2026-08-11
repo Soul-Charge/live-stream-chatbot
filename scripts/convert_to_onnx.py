@@ -63,7 +63,7 @@ CHARACTERS = [
         "refText": "正しい説明がなされるのかな。それなら早く向かわないと……。",
     },
     {
-        "characterName": "MyGO",
+        "characterName": "tomori",
         "comment": "高松灯",
         "language": "jp",
         "ckpt": os.path.join(GPT_WEIGHTS_DIR, "MyGO_高松灯_v2pp.ckpt"),

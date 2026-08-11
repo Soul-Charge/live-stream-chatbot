@@ -6,7 +6,7 @@ import { ConfigStore } from './config.js';
 import { RequestError, matchRole, parseRequest } from './request.js';
 import { TTSEngine } from './tts.js';
 import { PlayerQueue } from './player.js';
-import { ensureTtsApi } from './api.js';
+import { ensureTtsApi, startTtsApiGuard, stopSpawnedTtsApi } from './api.js';
 
 const CONFIG_FILE = resolve('config', 'config.json');
 const EXAMPLE_FILE = resolve('config', 'config.example.json');
@@ -112,11 +112,32 @@ async function main() {
     }
   });
 
+  const guard = startTtsApiGuard(
+    () => store.get(),
+    log,
+    {
+      onRestarted: async () => {
+        tts.dispose();
+        const results = await tts.preloadAll();
+        const failed = results.filter((result) => !result.ok);
+        if (failed.length > 0) {
+          log(
+            'error',
+            `恢复后角色预加载失败 ${failed.length}/${results.length}: ${failed.map((item) => item.key).join(', ')}`,
+          );
+        } else {
+          log('info', `恢复后角色预加载完成（${results.length} 个）`);
+        }
+      },
+    },
+  );
+
   let shuttingDown = false;
   const shutdown = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
     log('info', '正在关闭服务...');
+    guard.stop();
     server.close();
     store.close();
     player.close();
@@ -127,6 +148,7 @@ async function main() {
     } catch (err) {
       log('error', `Genie 关闭清理失败: ${err.message}`);
     }
+    stopSpawnedTtsApi(log);
     clearTimeout(exitTimer);
     process.exit(0);
   };

@@ -1,7 +1,7 @@
 # Genie-TTS 引擎迁移实施计划
 
-> **执行状态（2026-08-11）**：阶段 0-4 ✅、阶段 5 ✅ 均已完成（含真实直播间弹幕
-> 捕获合成验证）；阶段 6/7 未开始。
+> **执行状态（2026-08-11）**：阶段 0-6 ✅ 均已完成（阶段 5 含真实直播间弹幕
+> 捕获合成验证；阶段 6 自动启动与守护已实现并单测通过）；阶段 7 未开始。
 > 详细结果见《[阶段0-验证结果.md](阶段0-验证结果.md)》《[阶段1-转换记录.md](阶段1-转换记录.md)》。
 
 ## 1. 背景与目标
@@ -280,21 +280,30 @@
   验证脚本已演示客户端补头写法）。
 - 保留现有播放队列顺序，避免并发播放。
 
-### 阶段 6：启动与守护
+### 阶段 6：启动与守护 ✅ 已完成（2026-08-11）
 
-- **当前状态**：独立启动入口 `scripts/start_genie_server.py` 已就绪（CPU/GPU 探测、
-  LRU 修复、读 `config.json` 的 `genie` 配置块）；但 `src/api.js` 的 `ensureTtsApi`
-  仍读旧 `gptSoVits.path / API.bat` 逻辑，`isTtsApiUp` 仍 GET `/`，尚未接入 Genie。
-- 将 `src/api.js` 中启动 GPT-SoVITS `API.bat` 的逻辑改为启动 Genie 服务器：
-  - 推荐用独立 Python 脚本调用 `genie.start_server(host, port, workers=1)`。
-  - 启动脚本同样使用 `.\.venv-genie\Scripts\python.exe` 运行，确保加载的是项目内虚拟环境的 `genie_tts`。
-  - 健康探测改为 TCP 连接或 `GET /openapi.json`（Genie 无专用 health 接口）。
-  - `autoStart=false` 时只探测不拉起；拉起命令与超时/轮询参数读 `genie` 配置块。
-  - 保留“检查后端是否已启动，未启动则拉起并等待就绪”的现有机制。
+执行结果摘要：
+
+- `src/api.js` 已从 GPT-SoVITS `API.bat` 逻辑改为 Genie 托管：
+  - `isTtsApiUp` 探测 `GET /openapi.json`（Genie 无专用 health 接口）。
+  - `ensureTtsApi` 读 `genie` 配置块：`autoStart=false` 时只探测不拉起；
+    否则用 `.venv-genie\Scripts\python.exe` 运行 `scripts/start_genie_server.py`，
+    日志重定向到 `logs/genie_auto.out.log` / `genie_auto.err.log`，
+    按 `startupTimeoutMs` / `pollIntervalMs` 等待就绪。
+  - `startTtsApiGuard` 运行中守护：每 `pollIntervalMs` 探测，Genie 掉线时
+    自动重新拉起，恢复后回调 `onRestarted` 让中间件重新预加载角色
+    （Genie 重启后内存中的角色会丢失，必须重载）。
+  - 自动拉起的进程由中间件管理：`shutdown` 时先优雅卸载角色，再关闭
+    自动启动的 Genie 子进程；用户手动开的 Genie 不受影响。
+- `src/index.js` 接入：`ensureTtsApi → preloadAll → 监听 7788 → 启动守护`；
+  守护检测到 Genie 恢复后 `tts.dispose()` + `preloadAll()` 重建角色缓存。
+- 单测通过（临时 fake Genie + 临时脚本，已删除）：首次自动拉起、
+  进程退出后再次拉起、守护掉线重连并触发重新预加载、停止时关闭自动子进程。
 - 启动顺序：
   1. 检查 Genie 服务器
   2. 加载所有角色并设置参考音频
   3. 启动 7788 弹幕中间件
+  4. 守护 Genie 运行状态（可选自动重启）
 
 ### 阶段 7：验证与回滚
 

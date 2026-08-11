@@ -36,18 +36,6 @@
         "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/hiro_e8_s2184.pth"
       }
     },
-    "塰歪比巴B": {
-      "comment": "高松灯",
-      "characterName": "tomori",
-      "onnxModelDir": "F:/AiSound/Genie-TTS-onnx/CharacterModels/tomori/tts_models",
-      "language": "jp",
-      "refAudio": "F:/AiSound/Genie-TTS-onnx/CharacterModels/tomori/prompt_wav/新しい模様の見つけたから。買ったのを、整理しようと思って…….wav",
-      "refText": "新しい模様の見つけたから。買ったのを、整理しようと思って……",
-      "params": {
-        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/MyGO_高松灯_v2pp.ckpt",
-        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/MyGO_高松灯_v2pp.pth"
-      }
-    },
     "聪明露娜": {
       "comment": "诗歌剧",
       "characterName": "诗歌剧",

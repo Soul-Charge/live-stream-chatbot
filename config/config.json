@@ -30,15 +30,6 @@
         "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/hiro_e8_s2184.pth"
       }
     },
-    "塰歪比巴B": {
-      "comment": "高松灯",
-      "refAudio": "F:/AiSound/训练文件/自整理用音频/tomori/新しい模様の見つけたから。買ったのを、整理しようと思って…….ogg",
-      "refText": "新しい模様の見つけたから。買ったのを、整理しようと思って……",
-      "params": {
-        "gpt_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/GPT_weights_v2ProPlus/MyGO_高松灯_v2pp.ckpt",
-        "sovits_path": "F:/AiSound/GPT-SoVITS-v2pro-20250604/SoVITS_weights_v2ProPlus/MyGO_高松灯_v2pp.pth"
-      }
-    },
     "聪明露娜": {
       "comment": "诗歌剧",
       "refAudio": "F:/AiSound/训练文件/自整理用音频/曼波诗歌剧/マチカネタンホイザです！よろよろです～♪.mp3",

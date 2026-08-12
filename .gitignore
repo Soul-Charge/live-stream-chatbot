@@ -141,3 +141,14 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Genie-TTS local Python environment and pip cache (avoid committing/backing up)
+.venv-genie/
+.pip-cache/
+
+# Genie-TTS runtime resources downloaded on first import (~391 MB)
+GenieData/
+
+# Python bytecode cache
+__pycache__/
+*.pyc

@@ -37,6 +37,7 @@ export const DEFAULT_CONFIG = {
     concurrency: 1,
     requestTimeoutMs: 30000,
     textLang: 'auto',
+    textLangWhenKana: '',
     promptLang: 'zh',
     textSplitMethod: 'cut0',
     batchSize: 1,

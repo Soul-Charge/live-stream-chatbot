@@ -46,7 +46,7 @@
 - `text`：文本清洗规则，包括最长长度、屏蔽词（`reject` 拦截 / `strip` 删除）与替换字典；所有规则统一放在同目录的 `config/replacements.json`，包含 `replacements`（基础字符串替换）、`startFilters`（弹幕以指定词开头时整条跳过）和 `entranceFilter`（弹幕以“欢迎”开头且包含机器人名时整条跳过）。
 - `roles`：角色映射表。程序只检查弹幕文本开头的“角色名说”来切换角色，角色名可以是角色键或 `comment` 注释；角色匹配使用替换前的原始文本，文本替换/过滤只作用于最终合成文本，不会影响角色识别。未匹配时使用 `default`，也可通过请求参数 `role` 精确指定。
 - `gptSoVits`：GPT-SoVITS 安装目录与自动启动配置。`path` 指向推理 API 所在目录，`autoStart` 为 `true` 时主程序会在 API 未运行时自动执行 `startScript`，`startupTimeoutMs` 为等待就绪的最长时间。API 就绪后会用 `roles.default.params` 中的 `gpt_path`/`sovits_path` 设置模型。
-- `tts`：后端地址与合成参数。`textLang` 设为 `auto` 时会自动识别中日文；`params` 为公共载荷扩展字段，各角色的 `params` 可覆盖，适配不同 GPT-SoVITS 封装版本；`promptLang` 应与参考文本语言一致（日文参考音频建议填 `ja`）。
+- `tts`：后端地址与合成参数。`textLang` 为无假名文本使用的语言（中文直播间推荐 `all_zh`，避免短中文弹幕被引擎 `auto` 误判为日文）；`textLangWhenKana` 非空时，检测到平假名/片假名/半角假名的弹幕改用它（推荐 `auto`，保留中日混合弹幕识别）；`params` 为公共载荷扩展字段，各角色的 `params` 可覆盖，适配不同 GPT-SoVITS 封装版本；`promptLang` 应与参考文本语言一致（日文参考音频建议填 `ja`）。
 - `player`：本地播放器命令，默认使用 ffplay（来自 FFmpeg），需已安装并加入 PATH。
 
 配置文件保存后会自动热重载，无需重启服务；`server` 监听端口等基础参数改动需重启生效。

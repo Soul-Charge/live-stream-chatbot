@@ -1,6 +1,19 @@
 import { Readable } from 'node:stream';
 import { setTtsWeights } from './api.js';
 
+// 平假名、片假名、半角片假名与“々”。出现假名时优先交给引擎 auto 做中日切分，
+// 否则默认语言即可（中文直播间的弹幕以中文为主，避免短中文片段被 auto 误判为 ja）。
+const KANA_RE = /[\u3040-\u30FF\u31F0-\u31FF\uFF66-\uFF9F\u3005]/u;
+
+export function resolveTextLang(text, ttsConfig) {
+  const textLang = String(ttsConfig?.textLang ?? 'auto').toLowerCase();
+  const whenKana = String(ttsConfig?.textLangWhenKana ?? '').toLowerCase();
+  if (whenKana && KANA_RE.test(String(text ?? ''))) {
+    return whenKana;
+  }
+  return textLang;
+}
+
 function modelKeyOf(params) {
   const gptPath = params?.gpt_path;
   const sovitsPath = params?.sovits_path;
@@ -87,7 +100,7 @@ export class TTSEngine {
     const baseUrl = String(tts.baseUrl ?? 'http://127.0.0.1:9880').replace(/\/+$/, '');
     const endpoint = String(tts.endpoint ?? '/tts');
     const url = baseUrl + (endpoint.startsWith('/') ? endpoint : `/${endpoint}`);
-    const textLang = String(tts.textLang ?? 'auto').toLowerCase();
+    const textLang = resolveTextLang(text, tts);
 
     const roleParams = role?.params ?? {};
     const modelKey = modelKeyOf(roleParams);

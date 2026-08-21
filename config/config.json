@@ -1,13 +1,15 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 7788,
+    "port": 8899,
     "path": "/tts",
     "maxBodyBytes": 16384
   },
   "text": {
-    "maxTextLength": 200,
-    "blockedWords": ["测试屏蔽词"],
+    "maxTextLength": 120,
+    "blockedWords": [
+      "测试屏蔽词"
+    ],
     "blockedMode": "reject",
     "replacements": {}
   },
@@ -53,28 +55,81 @@
     "path": "F:/AiSound/GPT-SoVITS-v2pro-20250604",
     "autoStart": true,
     "startScript": "API.bat",
-    "startupTimeoutMs": 180000,
-    "pollIntervalMs": 2000
+    "startupTimeoutMs": 600000,
+    "pollIntervalMs": 2000,
+    "env": {},
+    "watchdog": {
+      "enabled": true,
+      "intervalMs": 30000,
+      "maxPrivateMemoryMB": 10240,
+      "restartCooldownMs": 120000
+    }
   },
   "tts": {
     "baseUrl": "http://127.0.0.1:9880",
     "endpoint": "/tts",
     "concurrency": 1,
-    "requestTimeoutMs": 30000,
+    "requestTimeoutMs": 300000,
     "textLang": "all_zh",
     "textLangWhenKana": "auto",
     "promptLang": "ja",
-    "textSplitMethod": "cut0",
+    "textSplitMethod": "cut5",
     "batchSize": 1,
     "mediaType": "wav",
     "streamingMode": true,
-    "params": {}
+    "params": {},
+    "streamHighWaterMark": 16777216,
+    "warmup": {
+      "enabled": true,
+      "text": "测试。"
+    },
+    "cache": {
+      "enabled": false,
+      "maxEntries": 4,
+      "maxBytes": 4194304,
+      "maxEntryBytes": 4194304,
+      "disk": {
+        "enabled": false,
+        "dir": "data/tts-cache",
+        "maxTotalBytes": 536870912,
+        "maxEntryBytes": 4194304
+      }
+    }
   },
   "player": {
     "command": "ffplay",
-    "args": ["-nodisp", "-autoexit", "-loglevel", "quiet", "-i", "-"]
+    "args": [
+      "-nodisp",
+      "-autoexit",
+      "-loglevel",
+      "quiet",
+      "-i",
+      "-"
+    ]
   },
   "log": {
-    "level": "info"
+    "level": "debug"
+  },
+  "database": {
+    "enabled": true,
+    "path": "data/danmaku.sqlite3",
+    "journalMode": "wal",
+    "synchronous": "normal",
+    "busyTimeoutMs": 5000,
+    "storeRejected": true,
+    "retentionDays": 90,
+    "roomId": "",
+    "sessionTitle": "live-stream-chatbot",
+    "readToken": ""
+  },
+  "hotPhrase": {
+    "enabled": false,
+    "windowMinutes": 10,
+    "minCount": 3,
+    "topN": 10,
+    "minTextLength": 2,
+    "maxTextLength": 80,
+    "maxGeneratePerRound": 5,
+    "skipWhileBusy": true
   }
 }

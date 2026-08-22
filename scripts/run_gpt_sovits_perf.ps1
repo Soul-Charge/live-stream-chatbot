@@ -4,7 +4,8 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 $config = Get-Content -Path (Join-Path $root 'config/config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-$apiDir = 'F:/AiSound/GPT-SoVITS-v2pro-20250604'
+$apiDir = [string]$config.gptSoVits.path
+if (-not $apiDir) { throw 'config.json 中 gptSoVits.path 为空' }
 $python = Join-Path $apiDir 'runtime/python.exe'
 $apiOut = Join-Path $env:TEMP 'gpt_sovits_perf_api.out.log'
 $apiErr = Join-Path $env:TEMP 'gpt_sovits_perf_api.err.log'
@@ -123,6 +124,8 @@ if ($existing) {
     $apiOutLog = Join-Path $env:TEMP 'gpt_sovits_perf_api.out.log'
     $apiErrLog = Join-Path $env:TEMP 'gpt_sovits_perf_api.err.log'
     Remove-Item $apiOutLog, $apiErrLog -ErrorAction SilentlyContinue
+    # 不注入 expandable_segments：本机 torch 2.0.0 不支持，会报 Unrecognized CachingAllocator option。
+    Remove-Item Env:PYTORCH_CUDA_ALLOC_CONF -ErrorAction SilentlyContinue
     $apiProc = Start-Process -FilePath $python -ArgumentList @('-u', 'api_v2.py', '-a', '127.0.0.1', '-p', '9880', '-c', 'GPT_SoVITS/configs/tts_infer.yaml') -WorkingDirectory $apiDir -PassThru -WindowStyle Hidden -RedirectStandardOutput $apiOutLog -RedirectStandardError $apiErrLog
     $apiPid = $apiProc.Id
     $startedByUs = $true
@@ -173,8 +176,8 @@ try {
             text_lang = 'auto'
             ref_audio_path = [string]$role.refAudio
             prompt_text = [string]$role.refText
-            prompt_lang = 'ja'
-            text_split_method = 'cut0'
+            prompt_lang = [string]$config.tts.promptLang
+            text_split_method = [string]$config.tts.textSplitMethod
             batch_size = 1
             media_type = 'wav'
             streaming_mode = $true

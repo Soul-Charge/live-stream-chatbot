@@ -1,0 +1,117 @@
+--- a/GPT_SoVITS/TTS_infer_pack/TTS.py
++++ b/GPT_SoVITS/TTS_infer_pack/TTS.py
+@@ -445,8 +445,9 @@
+ 
+         self._init_models()
+ 
++        # V3 CPU 卸载：BERT 特征在 CPU 上计算，to_batch 阶段再搬回合成设备。
+         self.text_preprocessor: TextPreprocessor = TextPreprocessor(
+-            self.bert_model, self.bert_tokenizer, self.configs.device
++            self.bert_model, self.bert_tokenizer, torch.device("cpu")
+         )
+ 
+         self.prompt_cache: dict = {
+@@ -477,18 +478,16 @@
+         print(f"Loading CNHuBERT weights from {base_path}")
+         self.cnhuhbert_model = CNHubert(base_path)
+         self.cnhuhbert_model = self.cnhuhbert_model.eval()
+-        self.cnhuhbert_model = self.cnhuhbert_model.to(self.configs.device)
+-        if self.configs.is_half and str(self.configs.device) != "cpu":
+-            self.cnhuhbert_model = self.cnhuhbert_model.half()
++        # V3 CPU 卸载：CNHubert 仅参考音频编码使用，常驻 CPU 省显存。
++        self.cnhuhbert_model = self.cnhuhbert_model.to("cpu").float()
+ 
+     def init_bert_weights(self, base_path: str):
+         print(f"Loading BERT weights from {base_path}")
+         self.bert_tokenizer = AutoTokenizer.from_pretrained(base_path)
+         self.bert_model = AutoModelForMaskedLM.from_pretrained(base_path)
+         self.bert_model = self.bert_model.eval()
+-        self.bert_model = self.bert_model.to(self.configs.device)
+-        if self.configs.is_half and str(self.configs.device) != "cpu":
+-            self.bert_model = self.bert_model.half()
++        # V3 CPU 卸载：BERT 仅文本前端使用，常驻 CPU 省显存。
++        self.bert_model = self.bert_model.to("cpu").float()
+ 
+     def init_vits_weights(self, weights_path: str):
+         self.configs.vits_weights_path = weights_path
+@@ -686,7 +685,8 @@
+     def init_sv_model(self):
+         if self.sv_model is not None:
+             return
+-        self.sv_model = SV(self.configs.device, self.configs.is_half)
++        # V3 CPU 卸载：声纹模型常驻 CPU 省显存；每个文本分段会调用一次，后续可缓存 sv_emb 避免重复计算。
++        self.sv_model = SV("cpu", False)
+ 
+     def enable_half_precision(self, enable: bool = True, save: bool = True):
+         """
+@@ -708,10 +708,7 @@
+                 self.t2s_model = self.t2s_model.half()
+             if self.vits_model is not None:
+                 self.vits_model = self.vits_model.half()
+-            if self.bert_model is not None:
+-                self.bert_model = self.bert_model.half()
+-            if self.cnhuhbert_model is not None:
+-                self.cnhuhbert_model = self.cnhuhbert_model.half()
++            # V3 CPU 卸载：BERT/CNHubert 保持 CPU float，不随半精度开关迁移。
+             if self.vocoder is not None:
+                 self.vocoder = self.vocoder.half()
+         else:
+@@ -719,10 +716,6 @@
+                 self.t2s_model = self.t2s_model.float()
+             if self.vits_model is not None:
+                 self.vits_model = self.vits_model.float()
+-            if self.bert_model is not None:
+-                self.bert_model = self.bert_model.float()
+-            if self.cnhuhbert_model is not None:
+-                self.cnhuhbert_model = self.cnhuhbert_model.float()
+             if self.vocoder is not None:
+                 self.vocoder = self.vocoder.float()
+ 
+@@ -739,10 +732,7 @@
+             self.t2s_model = self.t2s_model.to(device)
+         if self.vits_model is not None:
+             self.vits_model = self.vits_model.to(device)
+-        if self.bert_model is not None:
+-            self.bert_model = self.bert_model.to(device)
+-        if self.cnhuhbert_model is not None:
+-            self.cnhuhbert_model = self.cnhuhbert_model.to(device)
++        # V3 CPU 卸载：BERT/CNHubert 固定 CPU，不随 set_device 迁移。
+         if self.vocoder is not None:
+             self.vocoder = self.vocoder.to(device)
+         if self.sr_model is not None:
+@@ -817,16 +807,17 @@
+                 raise OSError(i18n("参考音频在3~10秒范围外，请更换！"))
+             wav16k = torch.from_numpy(wav16k)
+             zero_wav_torch = torch.from_numpy(zero_wav)
+-            wav16k = wav16k.to(self.configs.device)
+-            zero_wav_torch = zero_wav_torch.to(self.configs.device)
+-            if self.configs.is_half:
+-                wav16k = wav16k.half()
+-                zero_wav_torch = zero_wav_torch.half()
++            # V3 CPU 卸载：hubert 输入放 CPU 计算，完成后送回合成设备。
++            wav16k = wav16k.to("cpu").float()
++            zero_wav_torch = zero_wav_torch.to("cpu").float()
+ 
+             wav16k = torch.cat([wav16k, zero_wav_torch])
+             hubert_feature = self.cnhuhbert_model.model(wav16k.unsqueeze(0))["last_hidden_state"].transpose(
+                 1, 2
+             )  # .float()
++            hubert_feature = hubert_feature.to(self.configs.device)
++            if self.configs.is_half and str(self.configs.device) != "cpu":
++                hubert_feature = hubert_feature.half()
+             codes = self.vits_model.extract_latent(hubert_feature)
+ 
+             prompt_semantic = codes[0, 0].to(self.configs.device)
+@@ -1261,7 +1252,11 @@
+                     spec = spec.to(dtype=self.precision, device=self.configs.device)
+                     refer_audio_spec.append(spec)
+                     if self.is_v2pro:
+-                        sv_emb.append(self.sv_model.compute_embedding3(audio_tensor))
++                        # V3 CPU 卸载：声纹特征 CPU 计算，完成后送回合成设备。
++                        sv_emb.append(
++                            self.sv_model.compute_embedding3(audio_tensor.detach().to("cpu").float())
++                            .to(device=self.configs.device, dtype=self.precision)
++                        )
+ 
+                 if not streaming_mode:
+                     print(f"############ {i18n('预测语义Token')} ############")

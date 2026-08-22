@@ -1,5 +1,8 @@
-import { Readable } from 'node:stream';
+import { Readable, PassThrough } from 'node:stream';
 import { setTtsWeights } from './api.js';
+
+const SYNTHESIS_DONE = Symbol('ttsSynthesisDone');
+const SYNTHESIS_CACHE_HIT = Symbol('ttsSynthesisCacheHit');
 
 // 平假名、片假名、半角片假名与“々”。出现假名时优先交给引擎 auto 做中日切分，
 // 否则默认语言即可（中文直播间的弹幕以中文为主，避免短中文片段被 auto 误判为 ja）。
@@ -12,6 +15,14 @@ export function resolveTextLang(text, ttsConfig) {
     return whenKana;
   }
   return textLang;
+}
+
+export function whenSynthesisDone(stream) {
+  return stream?.[SYNTHESIS_DONE] ?? Promise.resolve();
+}
+
+export function isCachedSynthesis(stream) {
+  return stream?.[SYNTHESIS_CACHE_HIT] === true;
 }
 
 function modelKeyOf(params) {
@@ -27,6 +38,56 @@ function hasRoleModels(roles) {
 function effectiveConcurrency(config) {
   const configured = Number(config.tts?.concurrency) || 1;
   return hasRoleModels(config.roles) ? 1 : configured;
+}
+
+function positiveInt(value, fallback) {
+  const number = Math.floor(Number(value));
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function deferred() {
+  const out = {};
+  out.promise = new Promise((resolve, reject) => {
+    out.resolve = resolve;
+    out.reject = reject;
+    out.settled = false;
+  });
+  const originalResolve = out.resolve;
+  const originalReject = out.reject;
+  out.resolve = (value) => {
+    if (out.settled) return;
+    out.settled = true;
+    originalResolve(value);
+  };
+  out.reject = (err) => {
+    if (out.settled) return;
+    out.settled = true;
+    originalReject(err);
+  };
+  return out;
+}
+
+function waitForDrain(stream) {
+  return new Promise((resolve, reject) => {
+    if (stream.destroyed) {
+      reject(new Error('音频流在合成完成前被关闭'));
+      return;
+    }
+    const cleanup = () => {
+      stream.removeListener('drain', onDrain);
+      stream.removeListener('close', onClose);
+    };
+    const onDrain = () => {
+      cleanup();
+      resolve();
+    };
+    const onClose = () => {
+      cleanup();
+      reject(new Error('音频流在合成完成前被关闭'));
+    };
+    stream.once('drain', onDrain);
+    stream.once('close', onClose);
+  });
 }
 
 export class TaskQueue {
@@ -77,6 +138,12 @@ export class TTSEngine {
   #queue;
   #loadedModelKey;
   #log;
+  // A4 过渡内存缓存：默认已关闭（tts.cache.enabled=false），A5 文件缓存稳定后移除。
+  #cache = new Map();
+  #cacheBytes = 0;
+  #cacheGeneration = 0;
+  #backendRestarting = false;
+  #backendWaiters = new Set();
 
   constructor(store, log = () => {}) {
     this.#store = store;
@@ -86,15 +153,74 @@ export class TTSEngine {
     this.#loadedModelKey = modelKeyOf(config.roles?.default?.params);
   }
 
-  setConcurrency(value) {
+  get loadedModelKey() {
+    return this.#loadedModelKey;
+  }
+
+  setConcurrency(_configured) {
     this.#queue.setConcurrency(effectiveConcurrency(this.#store.get()));
   }
 
-  enqueue(text, role) {
-    return this.#queue.push(() => this.#synthesize(text, role));
+  resetLoadedModelKey() {
+    this.#loadedModelKey = modelKeyOf(this.#store.get().roles?.default?.params);
   }
 
-  async #synthesize(text, role) {
+  invalidateLoadedModelKey() {
+    this.#loadedModelKey = null;
+  }
+
+  pauseForBackendRestart() {
+    this.#backendRestarting = true;
+  }
+
+  resumeAfterBackendRestart() {
+    this.#backendRestarting = false;
+    for (const resolve of [...this.#backendWaiters]) {
+      this.#backendWaiters.delete(resolve);
+      resolve();
+    }
+  }
+
+  async #waitForBackendReady() {
+    while (this.#backendRestarting) {
+      await new Promise((resolve) => {
+        this.#backendWaiters.add(resolve);
+      });
+    }
+  }
+
+  clearCache() {
+    this.#cacheGeneration += 1;
+    this.#cache.clear();
+    this.#cacheBytes = 0;
+  }
+
+  enqueue(text, role, roleName = 'default') {
+    const ready = deferred();
+    const slot = this.#queue.push(async () => {
+      // watchdog 重启后端期间不发起新的合成，避免在 set_weights 竞态中拿错模型。
+      await this.#waitForBackendReady();
+      const handle = await this.#synthesize(text, role, String(roleName || 'default'));
+      Object.defineProperty(handle.stream, SYNTHESIS_DONE, {
+        value: handle.done,
+        enumerable: false,
+      });
+      ready.resolve(handle.stream);
+      await handle.done;
+    });
+
+    slot.catch((err) => {
+      if (!ready.settled) {
+        ready.reject(err);
+      } else {
+        this.#log('error', `TTS 合成流读取中断: ${err.message}`);
+      }
+    });
+
+    return ready.promise;
+  }
+
+  async #synthesize(text, role, roleName) {
     const config = this.#store.get();
     const tts = config.tts ?? {};
     const baseUrl = String(tts.baseUrl ?? 'http://127.0.0.1:9880').replace(/\/+$/, '');
@@ -116,6 +242,24 @@ export class TTSEngine {
       this.#loadedModelKey = modelKey;
     }
 
+    // A4 过渡命中路径：A5 落地后改为 tts_audio_cache 表查询 + createReadStream。
+    const cacheConfig = tts.cache ?? {};
+    const cacheKey =
+      cacheConfig.enabled === false ? null : `${roleName}\n${text}`;
+    if (cacheKey) {
+      const cached = this.#cacheGet(cacheKey);
+      if (cached) {
+        this.#log('debug', `TTS 缓存命中: ${roleName}`);
+        const stream = Readable.from(cached);
+        stream.on('error', () => {});
+        Object.defineProperty(stream, SYNTHESIS_CACHE_HIT, {
+          value: true,
+          enumerable: false,
+        });
+        return { stream, done: Promise.resolve() };
+      }
+    }
+
     const payload = {
       text,
       text_lang: textLang,
@@ -132,7 +276,10 @@ export class TTSEngine {
     if (role?.model) payload.model = role.model;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Number(tts.requestTimeoutMs) || 30000);
+    const timer = setTimeout(
+      () => controller.abort(),
+      Number(tts.requestTimeoutMs) || 30000,
+    );
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -145,10 +292,88 @@ export class TTSEngine {
         throw new Error(`TTS 后端返回 ${response.status}: ${detail.slice(0, 200)}`);
       }
       if (!response.body) throw new Error('TTS 后端未返回音频流');
-      const audio = Buffer.from(await response.arrayBuffer());
-      return Readable.from(audio);
-    } finally {
+
+      // A2 安全流式：任务 Promise 只等到“源流读完”（服务器生成结束），
+      // 但 PassThrough 在拿到响应体后立刻交给播放器，首块音频无需等整段合成完。
+      const stream = new PassThrough({
+        highWaterMark: positiveInt(tts.streamHighWaterMark, 16 * 1024 * 1024),
+      });
+      stream.on('error', () => {});
+      const source = Readable.fromWeb(response.body);
+      const generation = this.#cacheGeneration;
+      const done = this.#pumpResponse(source, stream, cacheKey, cacheConfig, generation).finally(
+        () => clearTimeout(timer),
+      );
+      return { stream, done };
+    } catch (err) {
       clearTimeout(timer);
+      throw err;
+    }
+  }
+
+  async #pumpResponse(source, stream, cacheKey, cacheConfig, generation) {
+    const maxEntryBytes = positiveInt(cacheConfig.maxEntryBytes, 4 * 1024 * 1024);
+    const chunks = [];
+    let cacheBytes = 0;
+    let cacheEligible = Boolean(cacheKey);
+
+    try {
+      for await (const chunk of source) {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        if (cacheEligible) {
+          if (cacheBytes + buffer.length > maxEntryBytes) {
+            cacheEligible = false;
+            chunks.length = 0;
+          } else {
+            chunks.push(buffer);
+            cacheBytes += buffer.length;
+          }
+        }
+        if (stream.destroyed) {
+          throw new Error('音频流在合成完成前被关闭');
+        }
+        if (!stream.write(buffer)) {
+          await waitForDrain(stream);
+        }
+      }
+
+      if (cacheEligible && cacheKey && cacheBytes > 0 && generation === this.#cacheGeneration) {
+        this.#cacheSet(cacheKey, Buffer.concat(chunks, cacheBytes));
+      }
+      stream.end();
+    } catch (err) {
+      stream.destroy(err);
+      throw err;
+    }
+  }
+
+  #cacheGet(key) {
+    const entry = this.#cache.get(key);
+    if (!entry) return null;
+    // Map 按插入序迭代，命中后重新插入即 LRU 置顶。
+    this.#cache.delete(key);
+    this.#cache.set(key, entry);
+    return entry.buffer;
+  }
+
+  #cacheSet(key, buffer) {
+    const cacheConfig = this.#store.get().tts?.cache ?? {};
+    const maxEntryBytes = positiveInt(cacheConfig.maxEntryBytes, 4 * 1024 * 1024);
+    if (!key || buffer.length === 0 || buffer.length > maxEntryBytes) return;
+
+    const previous = this.#cache.get(key);
+    if (previous) this.#cacheBytes -= previous.size;
+    this.#cache.set(key, { buffer, size: buffer.length });
+    this.#cacheBytes += buffer.length;
+
+    const maxEntries = positiveInt(cacheConfig.maxEntries, 64);
+    const maxBytes = positiveInt(cacheConfig.maxBytes, 32 * 1024 * 1024);
+    while (this.#cache.size > maxEntries || this.#cacheBytes > maxBytes) {
+      const oldest = this.#cache.keys().next();
+      if (oldest.done) break;
+      const evicted = this.#cache.get(oldest.value);
+      this.#cache.delete(oldest.value);
+      this.#cacheBytes -= evicted?.size ?? 0;
     }
   }
 }

@@ -27,6 +27,7 @@ export class PlayerQueue {
       const cfg = this.#getConfig() ?? {};
       const command = cfg.command;
       if (!command) {
+        stream.destroy();
         this.#onError(new Error('播放器命令未配置'));
         resolve();
         return;
@@ -38,6 +39,7 @@ export class PlayerQueue {
           stdio: ['pipe', 'ignore', 'pipe'],
         });
       } catch (err) {
+        stream.destroy();
         this.#onError(err);
         resolve();
         return;

@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 export const DEFAULT_CONFIG = {
   server: {
     host: '127.0.0.1',
-    port: 7788,
+    port: 8899,
     path: '/tts',
     maxBodyBytes: 16 * 1024,
   },
@@ -28,14 +28,23 @@ export const DEFAULT_CONFIG = {
     path: '',
     autoStart: false,
     startScript: 'API.bat',
-    startupTimeoutMs: 180000,
+    startupTimeoutMs: 600000,
     pollIntervalMs: 2000,
+    // 不预置 expandable_segments：本机 GPT-SoVITS 自带 torch 2.0.0 会直接报
+    // Unrecognized CachingAllocator option 并退出。
+    env: {},
+    watchdog: {
+      enabled: false,
+      intervalMs: 30000,
+      maxPrivateMemoryMB: 8192,
+      restartCooldownMs: 120000,
+    },
   },
   tts: {
     baseUrl: 'http://127.0.0.1:9880',
     endpoint: '/tts',
     concurrency: 1,
-    requestTimeoutMs: 30000,
+    requestTimeoutMs: 300000,
     textLang: 'auto',
     textLangWhenKana: '',
     promptLang: 'zh',
@@ -43,11 +52,50 @@ export const DEFAULT_CONFIG = {
     batchSize: 1,
     mediaType: 'wav',
     streamingMode: true,
+    streamHighWaterMark: 16777216,
+    warmup: {
+      enabled: true,
+      text: '测试。',
+    },
+    cache: {
+      enabled: false, // A4 过渡方案：A5 文件缓存落地前默认关闭，减少 Node 内存占用
+      maxEntries: 4,
+      maxBytes: 4194304,
+      maxEntryBytes: 4194304,
+      disk: {
+        enabled: false,
+        dir: 'data/tts-cache',
+        maxTotalBytes: 536870912,
+        maxEntryBytes: 4194304,
+      },
+    },
     params: {},
   },
   player: {
     command: 'ffplay',
     args: ['-nodisp', '-autoexit', '-loglevel', 'quiet', '-i', '-'],
+  },
+  database: {
+    enabled: true,
+    path: 'data/danmaku.sqlite3',
+    journalMode: 'wal',
+    synchronous: 'normal',
+    busyTimeoutMs: 5000,
+    storeRejected: true,
+    retentionDays: 90,
+    roomId: '',
+    sessionTitle: 'live-stream-chatbot',
+    readToken: '',
+  },
+  hotPhrase: {
+    enabled: false,
+    windowMinutes: 10,
+    minCount: 3,
+    topN: 10,
+    minTextLength: 2,
+    maxTextLength: 80,
+    maxGeneratePerRound: 5,
+    skipWhileBusy: true,
   },
   log: {
     level: 'info',

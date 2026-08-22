@@ -13,7 +13,9 @@ function readBody(req, maxBytes) {
     req.on('data', (chunk) => {
       total += chunk.length;
       if (total > maxBytes) {
-        reject(new RequestError(413, `请求体超过 ${maxBytes} 字节限制`));
+        const err = new RequestError(413, `请求体超过 ${maxBytes} 字节限制`);
+        err.rawText = Buffer.concat(chunks).toString('utf8');
+        reject(err);
         req.destroy();
         return;
       }
@@ -186,7 +188,9 @@ export async function parseRequest(req, config) {
       try {
         input = JSON.parse(bodyText);
       } catch {
-        throw new RequestError(400, '请求体不是合法 JSON');
+        const err = new RequestError(400, '请求体不是合法 JSON');
+        err.rawText = bodyText;
+        throw err;
       }
     } else if (contentType.includes('application/x-www-form-urlencoded')) {
       input = Object.fromEntries(new URLSearchParams(bodyText));
@@ -201,12 +205,25 @@ export async function parseRequest(req, config) {
   const text = input.text ?? input.msg ?? query.text ?? query.msg ?? '';
   const name = input.name ?? input.user ?? query.name ?? query.user ?? '';
   const roleHint = input.role ?? query.role ?? '';
+  const uid = input.uid ?? query.uid ?? '';
   const textConfig = config.text ?? {};
 
-  return {
-    text: cleanText(text, textConfig, { applyReplacements: false }),
-    speechText: cleanText(text, textConfig, { applyReplacements: true }),
-    name: String(name).trim(),
-    roleHint: String(roleHint).trim(),
-  };
+  try {
+    return {
+      text: cleanText(text, textConfig, { applyReplacements: false }),
+      speechText: cleanText(text, textConfig, { applyReplacements: true }),
+      rawText: String(text),
+      name: String(name).trim(),
+      uid: String(uid).trim(),
+      roleHint: String(roleHint).trim(),
+    };
+  } catch (err) {
+    if (err instanceof RequestError) {
+      err.rawText ??= String(text);
+      err.username ??= String(name).trim();
+      err.uid ??= String(uid).trim();
+      err.roleHint ??= String(roleHint).trim();
+    }
+    throw err;
+  }
 }
